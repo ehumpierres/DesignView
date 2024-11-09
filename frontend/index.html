@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Search Results</title>
+    <style>
+        .result-card {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px;
+            max-width: 300px;
+            display: inline-block;
+        }
+        .result-image {
+            max-width: 100%;
+            height: auto;
+        }
+        .similarity-score {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Product Search</h1>
+    
+    <form id="searchForm">
+        <input type="text" id="textQuery" placeholder="Enter text search...">
+        <input type="number" id="numResults" value="5" min="1">
+        <button type="submit">Search</button>
+    </form>
+
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('searchForm').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const response = await fetch('http://your-domain/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text_query: document.getElementById('textQuery').value,
+                    num_results: parseInt(document.getElementById('numResults').value)
+                })
+            });
+
+            const results = await response.json();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            results.forEach(result => {
+                const card = document.createElement('div');
+                card.className = 'result-card';
+                card.innerHTML = `
+                    <img class="result-image" src="${result.image_url}" alt="${result.metadata.name}">
+                    <h3>${result.metadata.name}</h3>
+                    <p>${result.metadata.description}</p>
+                    <p class="similarity-score">Similarity: ${result.similarity_score.toFixed(3)}</p>
+                `;
+                resultsDiv.appendChild(card);
+            });
+        };
+    </script>
+</body>
+</html> 
