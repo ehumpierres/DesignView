@@ -1,0 +1,1 @@
+This is a simple Flask API that allows you to search for products in an S3 bucket using a similarity search engine.
