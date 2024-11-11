@@ -1,3 +1,15 @@
+import os
+import boto3
+import io
+from PIL import Image
+from urllib.parse import urlparse
+from botocore.config import Config
+from botocore.exceptions import ClientError
+from tenacity import retry, stop_after_attempt, wait_exponential
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copy the entire S3Handler class from the original code
 class S3Handler:
     def __init__(self):
