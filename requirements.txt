@@ -15,5 +15,5 @@ regex
 fastapi==0.68.0
 uvicorn==0.15.0
 clip @ git+https://github.com/openai/CLIP.git
-pydantic==2.0.0
-pydantic-settings==2.0.0
+pydantic>=1.7.1,<2.0.0
+pydantic-settings==1.2.0
