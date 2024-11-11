@@ -2,55 +2,35 @@ import requests
 import json
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def test_api():
-    # Load products
     try:
         with open('products.json', 'r') as file:
             products = json.load(file)
-    except Exception as e:
-        logger.error(f"Error loading products.json: {str(e)}")
-        return
+            
+        # Print the exact payload being sent
+        logger.info("Request payload:")
+        logger.info(json.dumps(products, indent=2))
 
-    # Test image URLs first
-    for product in products:
-        url = product['image_url']
-        logger.info(f"\nTesting {product['id']}:")
-        try:
-            response = requests.head(url)
-            logger.info(f"Image URL status: {response.status_code}")
-            logger.info(f"Headers: {dict(response.headers)}")
-        except Exception as e:
-            logger.error(f"Error accessing image: {str(e)}")
+        api_url = "https://designview-staging-65571a6c93bd.herokuapp.com/api/index/build"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
 
-    # Now try the API
-    api_url = "https://designview-staging-65571a6c93bd.herokuapp.com/api/index/build"
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
-
-    # Try with single product first
-    logger.info("\nTesting with single product...")
-    try:
+        # Try with single product first
+        logger.info("\nTesting with single product...")
         single_product = [products[0]]
         response = requests.post(api_url, json=single_product, headers=headers)
-        logger.info(f"Single product API Response Status: {response.status_code}")
-        logger.info(f"Single product API Response: {response.text}")
-    except Exception as e:
-        logger.error(f"Single product API Error: {str(e)}")
+        logger.info(f"Request payload: {json.dumps(single_product, indent=2)}")
+        logger.info(f"Response Status: {response.status_code}")
+        logger.info(f"Response Headers: {dict(response.headers)}")
+        logger.info(f"Response Body: {response.text}")
 
-    # Try with all products
-    logger.info("\nTesting with all products...")
-    try:
-        response = requests.post(api_url, json=products, headers=headers)
-        logger.info(f"API Response Status: {response.status_code}")
-        logger.info(f"API Response: {response.text}")
     except Exception as e:
-        logger.error(f"API Error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
 
 if __name__ == "__main__":
     test_api()

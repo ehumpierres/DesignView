@@ -85,8 +85,9 @@ async def root():
     Root endpoint providing API information.
     """
     return {
-        "name": "Product Search API",
+        "name": "DesignView AI Product Search API",
         "version": "1.0",
+        "authors": "Ernesto Humpierres and Ryan Howard",
         "status": "running",
         "docs_url": "/docs"
     }
