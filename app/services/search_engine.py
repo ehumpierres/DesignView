@@ -17,13 +17,18 @@ logger = logging.getLogger(__name__)
 class ProductSearchEngine:
     def __init__(self, model_name: str = "ViT-B/32"):
         """Initialize the search engine."""
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model, self.preprocess = clip.load(model_name, device=self.device)
+        self.device = "cpu"  # Force CPU usage
+        torch.set_num_threads(4)  # Limit torch threads
+        self.model, self.preprocess = clip.load(model_name, device=self.device, jit=True)
         self.index = None
         self.product_mapping = {}
         self.s3_handler = S3Handler()
         self.index_key = "faiss_index/product_search_index.pkl"
         self.mapping_key = "faiss_index/product_mapping.json"
+        
+        # Clear CUDA cache if it was used
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     async def save_index(self) -> bool:
         """Save FAISS index and product mapping to S3."""

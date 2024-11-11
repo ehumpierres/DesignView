@@ -4,6 +4,7 @@ from app.routes.api import router
 from app.services.search_engine import ProductSearchEngine
 import logging
 from fastapi.background import BackgroundTasks
+import torch
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,11 +29,16 @@ search_engine = None
 async def startup_event():
     """Initialize search engine in the background."""
     global search_engine
-    search_engine = ProductSearchEngine()
-    
-    # Don't wait for index loading during startup
-    background_tasks = BackgroundTasks()
-    background_tasks.add_task(search_engine.load_index)
+    try:
+        torch.backends.cudnn.enabled = False  # Reduce memory usage
+        torch.backends.cudnn.benchmark = False
+        search_engine = ProductSearchEngine()
+        
+        # Run index loading in background
+        background_tasks = BackgroundTasks()
+        background_tasks.add_task(search_engine.load_index)
+    except Exception as e:
+        logger.error(f"Error initializing search engine: {str(e)}")
 
 @app.get("/api/status")
 async def get_status():
