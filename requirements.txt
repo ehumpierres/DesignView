@@ -1,19 +1,15 @@
-Flask==2.0.1
-flask-cors==3.0.10
-gunicorn==20.1.0
+fastapi>=0.68.0,<0.69.0
+uvicorn==0.15.0
+clip @ git+https://github.com/openai/CLIP.git
 boto3==1.26.137
 faiss-cpu==1.7.1
 Pillow==8.3.2
 python-dotenv==0.19.0
 numpy==1.21.0
 tenacity==8.0.1
+pydantic==1.10.13
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==1.9.0+cpu
 torchvision==0.10.0+cpu
 ftfy
 regex
-fastapi>=0.68.0,<0.69.0
-uvicorn==0.15.0
-clip @ git+https://github.com/openai/CLIP.git
-pydantic==1.10.13
-python-dotenv==0.19.0
