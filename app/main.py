@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from app.routes.api import router
 import gc
 import torch
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 # FastAPI application
 app = FastAPI(title="Product Search API")
 
+# Mount frontend directory
+app.mount("/frontend", StaticFiles(directory="app/frontend"), name="frontend")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -21,10 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/", response_class=PlainTextResponse)
+@app.get("/")
 async def root():
-    """Landing page route"""
-    return "Welcome to the DesignView Product Search API. Visit /docs for API documentation."
+    """Serve index.html from frontend directory"""
+    return FileResponse('app/frontend/index.html')
 
 @app.on_event("startup")
 async def startup_event():

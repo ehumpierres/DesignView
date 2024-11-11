@@ -85,18 +85,15 @@
                     throw new Error('Please provide either text query or image');
                 }
                 
-                let searchBody = { 
-                    num_results: numResults,
-                    text: textQuery || null,
-                    image_url: null
-                };
+                let searchBody = { num_results: numResults };
                 
-                if (imageFile) {
+                if (textQuery) {
+                    searchBody.text_query = textQuery;
+                } else if (imageFile) {
                     try {
                         resultsDiv.innerHTML = '<div class="loading">Uploading image...</div>';
                         const imageUrl = await uploadImageToS3(imageFile);
                         searchBody.image_url = imageUrl;
-                        searchBody.text = null;
                     } catch (uploadError) {
                         throw new Error(`Image upload failed: ${uploadError.message}`);
                     }
@@ -129,18 +126,17 @@
                     const card = document.createElement('div');
                     card.className = 'result-card';
                     
-                    const name = result.metadata.name || 'Unnamed Product';
-                    const description = result.metadata.description || '';
-                    const specifications = result.metadata.specifications || {};
-                    const category = result.metadata.category || '';
+                    // Handle potentially missing metadata fields
+                    const metadata = result.metadata || {};
+                    const name = metadata.name || 'Unnamed Product';
+                    const description = metadata.description || '';
                     
                     card.innerHTML = `
                         <img class="result-image" src="${result.image_url}" alt="${name}"
                              onerror="this.src='placeholder-image.jpg'">
                         <h3>${name}</h3>
                         ${description ? `<p>${description}</p>` : ''}
-                        ${category ? `<p>Category: ${category}</p>` : ''}
-                        <p class="similarity-score">Similarity: ${(result.score * 100).toFixed(1)}%</p>
+                        <p class="similarity-score">Similarity: ${(result.similarity_score * 100).toFixed(1)}%</p>
                     `;
                     resultsDiv.appendChild(card);
                 });

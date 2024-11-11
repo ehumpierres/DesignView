@@ -17,12 +17,13 @@ router = APIRouter()
 s3_handler = S3Handler()
 
 @router.post('/search')
-async def search_products(query: SearchQuery):
+async def search_products(query: SearchQuery, request: Request):
     """
     Endpoint to search for similar products using image or text.
     
     Args:
         query (SearchQuery): Contains either image_url or text_query
+        request (Request): FastAPI request object
         
     Returns:
         List[SearchResult]: Ranked list of similar products
