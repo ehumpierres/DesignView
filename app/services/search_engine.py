@@ -7,7 +7,7 @@ import numpy as np
 import io
 import json
 import logging
-from app.models.product import Product, SearchResult
+from app.models.product import Product, SearchResult, SearchQuery
 from app.services.s3_handler import S3Handler
 from botocore.exceptions import ClientError
 

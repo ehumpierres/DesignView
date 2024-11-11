@@ -13,8 +13,8 @@ class Product(BaseModel):
     image_url: HttpUrl
 
 class SearchQuery(BaseModel):
-    image_url: Optional[HttpUrl]
-    text_query: Optional[str]
+    text: Optional[str] = None
+    image_url: Optional[str] = None
     num_results: int = 5
 
 class SearchResult(BaseModel):
