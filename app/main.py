@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes.api import router  # Make sure this path is correct
 import gc
 import torch
 import logging
