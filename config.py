@@ -1,14 +1,12 @@
-from pydantic_settings import BaseSettings
+import os
+from dotenv import load_dotenv
 
-class Settings(BaseSettings):
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_S3_BUCKET: str
-    API_URL: str = "https://designview-staging-65571a6c93bd.herokuapp.com/"  # Update this with your Heroku app URL
+load_dotenv()
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = 'utf-8'
-        case_sensitive = True
+class Settings:
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')
+    API_URL = os.getenv('API_URL', "https://your-app-name.herokuapp.com")
 
 settings = Settings()
