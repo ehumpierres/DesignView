@@ -1,3 +1,18 @@
+from typing import Union, List
+from PIL import Image
+import torch
+import clip
+import faiss
+import numpy as np
+import io
+import json
+import logging
+from app.models.product import Product, SearchResult
+from app.services.s3_handler import S3Handler
+from botocore.exceptions import ClientError
+
+logger = logging.getLogger(__name__)
+
 # Copy the entire ProductSearchEngine class from the original code
 class ProductSearchEngine:
     def __init__(self, model_name: str = "ViT-B/32"):
