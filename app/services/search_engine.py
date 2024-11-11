@@ -43,8 +43,8 @@ class ProductSearchEngine:
         Sets up device configuration, model placeholders, and S3 paths.
         """
         if not self.initialized:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            torch.set_num_threads(2)  # Reduce thread count
+            self.device = "cpu"  # Force CPU to save memory
+            torch.set_num_threads(1)  # Limit threads
             self.model = None
             self.preprocess = None
             self.index = None
@@ -55,44 +55,66 @@ class ProductSearchEngine:
             self.model_loaded = False
             self.index_loaded = False
             self.feature_dim = 512
-            logger.info(f"ProductSearchEngine initialized with device: {self.device}")
+            logger.info("ProductSearchEngine initialized")
             self.initialized = True
 
     async def ensure_model_loaded(self):
-        """Ensure CLIP model is loaded"""
+        """Load CLIP model if not already loaded"""
         if not self.model_loaded:
             try:
                 logger.info("Loading CLIP model...")
-                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
-                self.model.eval()  # Set to evaluation mode
-                self.model_loaded = True  # Set to True only after successful loading
+                # Set to eval mode immediately to save memory
+                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device, jit=True)
+                self.model.eval()
+                
+                # Clear CUDA cache if available
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                
+                # Force garbage collection
+                gc.collect()
+                
+                self.model_loaded = True
                 logger.info("CLIP model loaded successfully")
             except Exception as e:
-                self.model_loaded = False
                 logger.error(f"Failed to load CLIP model: {str(e)}")
-                raise Exception(f"Failed to load CLIP model: {str(e)}")
-        return True
+                raise
 
-    async def _load_and_process_image(self, image_url: str) -> torch.Tensor:
-        """Load and process image from URL"""
+    async def _load_and_process_image(self, image_url: str):
+        """Load and preprocess image from URL"""
         try:
             response = requests.get(image_url)
             response.raise_for_status()
             image = Image.open(BytesIO(response.content)).convert('RGB')
-            processed_image = self.preprocess(image).unsqueeze(0).to(self.device)
-            return processed_image
+            image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+            
+            # Clear memory
+            del response
+            del image
+            gc.collect()
+            
+            return image_tensor
         except Exception as e:
-            logger.error(f"Error processing image from {image_url}: {str(e)}")
+            logger.error(f"Image loading failed for URL {image_url}: {str(e)}")
             raise
 
-    async def _extract_features(self, image_tensor: torch.Tensor) -> np.ndarray:
-        """Extract features from processed image"""
-        with torch.no_grad():
-            features = self.model.encode_image(image_tensor)
-            features = features.cpu().numpy()
-            # Normalize features
-            features = features / np.linalg.norm(features, axis=1, keepdims=True)
-            return features
+    async def _extract_features(self, image_tensor):
+        """Extract features from preprocessed image tensor"""
+        try:
+            with torch.no_grad():
+                features = self.model.encode_image(image_tensor)
+                features = features.cpu().numpy()
+                # Clear memory
+                del image_tensor
+                torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                gc.collect()
+                
+                # Normalize features
+                features = features / np.linalg.norm(features, axis=1, keepdims=True)
+                return features
+        except Exception as e:
+            logger.error(f"Feature extraction failed: {str(e)}")
+            raise
 
     async def build_index(self, products: List[Product]):
         """Build search index from products"""

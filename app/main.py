@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from app.routes.api import router
 import gc
 import torch
@@ -19,6 +20,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/", response_class=PlainTextResponse)
+async def root():
+    """Landing page route"""
+    return "Welcome to the DesignView Product Search API. Visit /docs for API documentation."
 
 @app.on_event("startup")
 async def startup_event():

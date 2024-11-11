@@ -1,1 +1,1 @@
-web: MALLOC_ARENA_MAX=2 PYTHONUNBUFFERED=1 uvicorn app.main:app --host=0.0.0.0 --port=$PORT --timeout-keep-alive=75 --workers 1 --limit-concurrency 20
+web: gunicorn app.main:app --workers 1 --threads 2 --timeout 120 --max-requests 1000 --max-requests-jitter 50 --worker-class uvicorn.workers.UvicornWorker
