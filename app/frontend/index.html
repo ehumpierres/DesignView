@@ -85,15 +85,18 @@
                     throw new Error('Please provide either text query or image');
                 }
                 
-                let searchBody = { num_results: numResults };
+                let searchBody = { 
+                    num_results: numResults,
+                    text: textQuery || null,
+                    image_url: null
+                };
                 
-                if (textQuery) {
-                    searchBody.text_query = textQuery;
-                } else if (imageFile) {
+                if (imageFile) {
                     try {
                         resultsDiv.innerHTML = '<div class="loading">Uploading image...</div>';
                         const imageUrl = await uploadImageToS3(imageFile);
                         searchBody.image_url = imageUrl;
+                        searchBody.text = null;
                     } catch (uploadError) {
                         throw new Error(`Image upload failed: ${uploadError.message}`);
                     }
@@ -126,17 +129,17 @@
                     const card = document.createElement('div');
                     card.className = 'result-card';
                     
-                    // Handle potentially missing metadata fields
-                    const metadata = result.metadata || {};
-                    const name = metadata.name || 'Unnamed Product';
-                    const description = metadata.description || '';
+                    const name = result.metadata.name || 'Unnamed Product';
+                    const description = result.metadata.description || '';
+                    const category = result.metadata.category || '';
                     
                     card.innerHTML = `
                         <img class="result-image" src="${result.image_url}" alt="${name}"
                              onerror="this.src='placeholder-image.jpg'">
                         <h3>${name}</h3>
                         ${description ? `<p>${description}</p>` : ''}
-                        <p class="similarity-score">Similarity: ${(result.similarity_score * 100).toFixed(1)}%</p>
+                        ${category ? `<p>Category: ${category}</p>` : ''}
+                        <p class="similarity-score">Similarity: ${(result.score * 100).toFixed(1)}%</p>
                     `;
                     resultsDiv.appendChild(card);
                 });
@@ -163,14 +166,12 @@
             return data.url;
         }
 
-        // Clear file input when text is entered
         document.getElementById('textQuery').addEventListener('input', (e) => {
             if (e.target.value) {
                 document.getElementById('imageUpload').value = '';
             }
         });
 
-        // Clear text input when file is selected
         document.getElementById('imageUpload').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 document.getElementById('textQuery').value = '';
