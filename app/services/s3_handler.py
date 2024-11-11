@@ -10,10 +10,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Copy the entire S3Handler class from the original code
 class S3Handler:
+    """
+    Handles S3 storage operations with retry logic.
+    Manages file uploads, downloads, and image retrieval.
+    """
+    
     def __init__(self):
-        """Initialize S3 client with retry configuration."""
+        """
+        Initializes S3 client with retry configuration.
+        
+        Sets up:
+            - AWS credentials from environment variables
+            - Retry configuration for resilience
+            - S3 bucket configuration
+            
+        Note:
+            Requires AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET
+            environment variables to be set
+        """
         config = Config(
             retries=dict(
                 max_attempts=3,
@@ -31,7 +46,22 @@ class S3Handler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def upload_file_object(self, file_object: bytes, s3_key: str) -> str:
-        """Upload a file object to S3 with retry logic."""
+        """
+        Uploads a file to S3 with retry logic.
+        
+        Args:
+            file_object (bytes): File data to upload
+            s3_key (str): Destination path in S3
+            
+        Returns:
+            str: Public URL of uploaded file
+            
+        Raises:
+            ClientError: If S3 upload fails
+            
+        Note:
+            Implements exponential backoff retry strategy
+        """
         try:
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
@@ -45,7 +75,21 @@ class S3Handler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def download_file_object(self, s3_key: str) -> bytes:
-        """Download a file object from S3 with retry logic."""
+        """
+        Downloads a file from S3 with retry logic.
+        
+        Args:
+            s3_key (str): Path of file in S3
+            
+        Returns:
+            bytes: File data
+            
+        Raises:
+            ClientError: If S3 download fails
+            
+        Note:
+            Implements exponential backoff retry strategy
+        """
         try:
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name,
@@ -58,7 +102,23 @@ class S3Handler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def get_image(self, s3_url: str) -> Image.Image:
-        """Get image from S3 URL with retry logic."""
+        """
+        Retrieves and opens an image from S3 with retry logic.
+        
+        Args:
+            s3_url (str): Full S3 URL of the image
+            
+        Returns:
+            Image.Image: PIL Image object in RGB mode
+            
+        Raises:
+            ClientError: If S3 operations fail
+            
+        Note:
+            - Parses S3 URL to extract key
+            - Converts image to RGB mode
+            - Implements exponential backoff retry strategy
+        """
         try:
             parsed_url = urlparse(s3_url)
             key = parsed_url.path.lstrip('/')
@@ -72,4 +132,4 @@ class S3Handler:
             return Image.open(io.BytesIO(image_data)).convert("RGB")
         except ClientError as e:
             logger.error(f"Error downloading image from S3: {str(e)}")
-            raise        # ... (copy the entire S3Handler class implementation)
+            raise

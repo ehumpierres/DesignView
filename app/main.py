@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.api import router  # Make sure this path is correct
+from app.routes.api import router
 import gc
 import torch
 import logging
@@ -24,10 +24,19 @@ search_engine = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize search engine in the background."""
+    """
+    Initializes application components during startup.
+    
+    Performs:
+        - Memory cleanup via garbage collection
+        - CUDA cache clearing if available
+        - Search engine initialization
+        
+    Raises:
+        Logs error if search engine initialization fails
+    """
     global search_engine
     try:
-        # Clear memory
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -40,7 +49,14 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown"""
+    """
+    Performs cleanup operations during application shutdown.
+    
+    Performs:
+        - Search engine deletion
+        - Memory cleanup via garbage collection
+        - CUDA cache clearing if available
+    """
     global search_engine
     if search_engine:
         del search_engine
@@ -50,7 +66,15 @@ async def shutdown_event():
 
 @app.get("/api/status")
 async def get_status():
-    """Check if the search engine is ready."""
+    """
+    Endpoint to check search engine readiness.
+    
+    Returns:
+        dict: Status information with "ready" status
+        
+    Raises:
+        HTTPException: 503 if search engine is not initialized
+    """
     if not search_engine or not search_engine.index:
         raise HTTPException(status_code=503, detail="Search engine is initializing")
     return {"status": "ready"}

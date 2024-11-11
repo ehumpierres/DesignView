@@ -18,7 +18,18 @@ s3_handler = S3Handler()
 
 @router.post('/search')
 async def search_products(query: SearchQuery):
-    """Search for products by image or text."""
+    """
+    Endpoint to search for similar products using image or text.
+    
+    Args:
+        query (SearchQuery): Contains either image_url or text_query
+        
+    Returns:
+        List[SearchResult]: Ranked list of similar products
+        
+    Raises:
+        HTTPException: 500 if search operation fails
+    """
     try:
         # Ensure model is loaded before search
         await search_engine.ensure_model_loaded()
@@ -30,7 +41,18 @@ async def search_products(query: SearchQuery):
 
 @router.post('/index/build')
 async def build_index(products: List[Product]):
-    """Build search index from product list."""
+    """
+    Endpoint to build search index from product list.
+    
+    Args:
+        products (List[Product]): List of products with images to index
+        
+    Returns:
+        dict: Success message indicating background process started
+        
+    Raises:
+        HTTPException: 500 if index building fails
+    """
     try:
         await search_engine.build_index(products)
         return {'message': 'Index building started in background'}
@@ -40,7 +62,16 @@ async def build_index(products: List[Product]):
 
 @router.get('/health')
 async def health_check():
-    """Health check endpoint."""
+    """
+    Endpoint to check system health status.
+    
+    Returns:
+        dict: Health information including:
+            - status: Current system status
+            - timestamp: Current UTC time
+            - index_loaded: Whether search index is loaded
+            - model_loaded: Whether CLIP model is loaded
+    """
     return {
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
@@ -50,7 +81,18 @@ async def health_check():
 
 @router.post("/upload-image")
 async def upload_image(file: UploadFile):
-    """Upload image to S3 and return the URL"""
+    """
+    Endpoint to upload an image to S3 storage.
+    
+    Args:
+        file (UploadFile): Image file to be uploaded
+        
+    Returns:
+        dict: Contains URL of uploaded image
+        
+    Raises:
+        HTTPException: 500 if upload fails
+    """
     try:
         filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
         content = await file.read()
@@ -65,10 +107,19 @@ async def upload_image(file: UploadFile):
 
 @router.get("/")
 async def root():
-    """Root endpoint that returns API information"""
+    """
+    Root endpoint providing API information.
+    
+    Returns:
+        dict: Basic API information including:
+            - name: API name
+            - version: Current version
+            - status: Running status
+            - docs_url: URL for API documentation
+    """
     return {
         "name": "Product Search API",
         "version": "1.0",
         "status": "running",
-        "docs_url": "/docs"  # FastAPI automatic documentation
+        "docs_url": "/docs"
     }

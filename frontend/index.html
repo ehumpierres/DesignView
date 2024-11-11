@@ -3,33 +3,66 @@
 <head>
     <title>Product Search Results</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .search-form {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        .search-options {
+            margin: 10px 0;
+        }
         .result-card {
             border: 1px solid #ccc;
-            padding: 10px;
+            padding: 15px;
             margin: 10px;
             max-width: 300px;
             display: inline-block;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .result-image {
             max-width: 100%;
             height: auto;
+            border-radius: 4px;
         }
         .similarity-score {
             color: #666;
             font-style: italic;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .error {
+            color: red;
+            padding: 10px;
+            background: #fff0f0;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
     <h1>Product Search</h1>
     
-    <form id="searchForm">
-        <input type="text" id="textQuery" placeholder="Enter text search...">
-        <div>
+    <form id="searchForm" class="search-form">
+        <div class="search-options">
+            <input type="text" id="textQuery" placeholder="Enter text search...">
+        </div>
+        <div class="search-options">
             <label for="imageUpload">Or search by image:</label>
             <input type="file" id="imageUpload" accept="image/*">
         </div>
-        <input type="number" id="numResults" value="5" min="1">
+        <div class="search-options">
+            <label for="numResults">Number of results:</label>
+            <input type="number" id="numResults" value="5" min="1" max="20">
+        </div>
         <button type="submit">Search</button>
     </form>
 
@@ -40,21 +73,33 @@
         
         document.getElementById('searchForm').onsubmit = async (e) => {
             e.preventDefault();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+            
             try {
                 const textQuery = document.getElementById('textQuery').value;
                 const imageFile = document.getElementById('imageUpload').files[0];
                 const numResults = parseInt(document.getElementById('numResults').value);
+                
+                if (!textQuery && !imageFile) {
+                    throw new Error('Please provide either text query or image');
+                }
                 
                 let searchBody = { num_results: numResults };
                 
                 if (textQuery) {
                     searchBody.text_query = textQuery;
                 } else if (imageFile) {
-                    // You'll need to implement image upload to S3 first
-                    // and then use the returned URL here
-                    const imageUrl = await uploadImageToS3(imageFile);
-                    searchBody.image_url = imageUrl;
+                    try {
+                        resultsDiv.innerHTML = '<div class="loading">Uploading image...</div>';
+                        const imageUrl = await uploadImageToS3(imageFile);
+                        searchBody.image_url = imageUrl;
+                    } catch (uploadError) {
+                        throw new Error(`Image upload failed: ${uploadError.message}`);
+                    }
                 }
+                
+                resultsDiv.innerHTML = '<div class="loading">Processing search...</div>';
                 
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
@@ -64,18 +109,34 @@
                     body: JSON.stringify(searchBody)
                 });
 
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Search failed');
+                }
+
                 const results = await response.json();
-                const resultsDiv = document.getElementById('results');
                 resultsDiv.innerHTML = '';
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div>No results found</div>';
+                    return;
+                }
 
                 results.forEach(result => {
                     const card = document.createElement('div');
                     card.className = 'result-card';
+                    
+                    // Handle potentially missing metadata fields
+                    const metadata = result.metadata || {};
+                    const name = metadata.name || 'Unnamed Product';
+                    const description = metadata.description || '';
+                    
                     card.innerHTML = `
-                        <img class="result-image" src="${result.image_url}" alt="${result.metadata.name}">
-                        <h3>${result.metadata.name}</h3>
-                        <p>${result.metadata.description}</p>
-                        <p class="similarity-score">Similarity: ${result.similarity_score.toFixed(3)}</p>
+                        <img class="result-image" src="${result.image_url}" alt="${name}"
+                             onerror="this.src='placeholder-image.jpg'">
+                        <h3>${name}</h3>
+                        ${description ? `<p>${description}</p>` : ''}
+                        <p class="similarity-score">Similarity: ${(result.similarity_score * 100).toFixed(1)}%</p>
                     `;
                     resultsDiv.appendChild(card);
                 });
@@ -94,12 +155,27 @@
             });
             
             if (!response.ok) {
-                throw new Error('Upload failed');
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Upload failed');
             }
             
             const data = await response.json();
             return data.url;
         }
+
+        // Clear file input when text is entered
+        document.getElementById('textQuery').addEventListener('input', (e) => {
+            if (e.target.value) {
+                document.getElementById('imageUpload').value = '';
+            }
+        });
+
+        // Clear text input when file is selected
+        document.getElementById('imageUpload').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                document.getElementById('textQuery').value = '';
+            }
+        });
     </script>
 </body>
 </html> 
