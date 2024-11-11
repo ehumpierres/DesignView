@@ -32,9 +32,23 @@ async def search_products(query: SearchQuery):
         HTTPException: 500 if search operation fails
     """
     try:
-        # Ensure model is loaded before search
+        # Get search_engine instance from app state
+        search_engine = request.app.state.search_engine
+        
+        # Ensure model and index are loaded
         await search_engine.ensure_model_loaded()
-        results = await search_engine.search(query)
+        
+        if not search_engine.index_loaded:
+            raise HTTPException(
+                status_code=400, 
+                detail="Search index not built. Please build index first."
+            )
+            
+        results = await search_engine.search(
+            query_image_url=query.image_url,
+            query_text=query.text,
+            num_results=query.num_results or 5
+        )
         return results
     except Exception as e:
         logger.error(f"Search error: {str(e)}")

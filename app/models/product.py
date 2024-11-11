@@ -1,5 +1,5 @@
-from typing import Dict, Optional
-from pydantic import BaseModel, HttpUrl
+from typing import Dict, Optional, Any, Union
+from pydantic import BaseModel, Field, HttpUrl
 
 class ProductMetadata(BaseModel):
     name: str
@@ -8,17 +8,47 @@ class ProductMetadata(BaseModel):
     category: Optional[str]
 
 class Product(BaseModel):
+    """Product model containing metadata and image URL"""
     id: str
-    metadata: ProductMetadata
+    metadata: Dict[str, Any]
     image_url: HttpUrl
 
 class SearchQuery(BaseModel):
-    text: Optional[str] = None
-    image_url: Optional[str] = None
-    num_results: int = 5
+    """Search query model supporting either image URL or text search"""
+    image_url: Optional[HttpUrl] = Field(
+        default=None, 
+        description="URL of the query image"
+    )
+    text: Optional[str] = Field(
+        default=None, 
+        description="Text query for semantic search"
+    )
+    num_results: Optional[int] = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Number of results to return (1-20)"
+    )
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "text": "modern black table lamp",
+                "num_results": 5
+            }
+        }
+
+    def validate_query(self):
+        """Ensure either image_url or text is provided, but not both"""
+        if self.image_url is None and self.text is None:
+            raise ValueError("Either image_url or text must be provided")
+        if self.image_url is not None and self.text is not None:
+            raise ValueError("Only one of image_url or text should be provided")
+        return True
 
 class SearchResult(BaseModel):
-    product_id: str
-    metadata: ProductMetadata
+    """Search result model containing product info and similarity score"""
+    id: str
+    metadata: Dict[str, Any]
     image_url: HttpUrl
-    similarity_score: float
+    score: float = Field(ge=0.0, le=1.0)
