@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import List
 from app.services.s3_handler import S3Handler
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,21 @@ async def build_index(products: List[Product]):
         HTTPException: 500 if index building fails
     """
     try:
+        for product in products:
+            try:
+                # Test image access
+                response = requests.head(product.image_url)
+                print(f"Status for {product.id}: {response.status_code}")
+                if response.status_code != 200:
+                    print(f"Cannot access image for {product.id}: {response.status_code}")
+                    continue
+            except Exception as e:
+                print(f"Error accessing {product.id}: {str(e)}")
+                continue
         await search_engine.build_index(products)
         return {'message': 'Index building started in background'}
     except Exception as e:
-        logger.error(f"Index building error: {str(e)}")
+        print(f"Build index error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get('/health')
@@ -105,21 +117,3 @@ async def upload_image(file: UploadFile):
         logger.error(f"Upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/")
-async def root():
-    """
-    Root endpoint providing API information.
-    
-    Returns:
-        dict: Basic API information including:
-            - name: API name
-            - version: Current version
-            - status: Running status
-            - docs_url: URL for API documentation
-    """
-    return {
-        "name": "Product Search API",
-        "version": "1.0",
-        "status": "running",
-        "docs_url": "/docs"
-    }

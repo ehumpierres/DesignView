@@ -11,7 +11,7 @@
             },
             "category": "accent lamps"
         },
-        "image_url": "https://your-s3-bucket.s3.amazonaws.com/sofa001.jpg"
+        "image_url": "https://designview-demo.s3.us-east-2.amazonaws.com/lamp0001.jpg"
     },
     {
         "id": "lamp0002",
@@ -24,6 +24,6 @@
             },
             "category": "accent lamps"
         },
-        "image_url": "https://your-s3-bucket.s3.amazonaws.com/chair001.jpg"
+        "image_url": "https://designview-demo.s3.us-east-2.amazonaws.com/lamp0002.jpg"
     }
 ] 

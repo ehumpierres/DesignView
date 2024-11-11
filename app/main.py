@@ -79,5 +79,17 @@ async def get_status():
         raise HTTPException(status_code=503, detail="Search engine is initializing")
     return {"status": "ready"}
 
+@app.get("/")
+async def root():
+    """
+    Root endpoint providing API information.
+    """
+    return {
+        "name": "Product Search API",
+        "version": "1.0",
+        "status": "running",
+        "docs_url": "/docs"
+    }
+
 # Include the router
 app.include_router(router, prefix="/api")
