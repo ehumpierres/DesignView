@@ -50,7 +50,10 @@ class ProductSearchEngine:
             self.s3_handler = S3Handler()
             self.index_key = "faiss_index/product_search_index.pkl"
             self.mapping_key = "faiss_index/product_mapping.json"
+            self.model_loaded = False
+            self.index_loaded = False
             self.initialized = True
+            logger.info("ProductSearchEngine initialized")
 
     async def ensure_model_loaded(self):
         """Ensure CLIP model is loaded"""
