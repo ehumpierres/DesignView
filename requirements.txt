@@ -16,3 +16,5 @@ ftfy
 regex
 requests
 python-multipart
+aiofiles==23.2.1
+
