@@ -22,7 +22,7 @@ var/
 
 # Environment variables
 .env
-.env.local
+*.env
 
 # Virtual Environment
 venv/

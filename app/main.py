@@ -21,33 +21,13 @@ import time
 from datetime import datetime
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
+from app.routes.api import router
+from app.models.product import ProductMetadata, Product, SearchQuery, SearchResult
+from app.services.search_engine import ProductSearchEngine
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Pydantic models for API
-class ProductMetadata(BaseModel):
-    name: str
-    description: str
-    specifications: Dict
-    category: Optional[str]
-
-class Product(BaseModel):
-    id: str
-    metadata: ProductMetadata
-    image_url: HttpUrl
-
-class SearchQuery(BaseModel):
-    image_url: Optional[HttpUrl]
-    text_query: Optional[str]
-    num_results: int = 5
-
-class SearchResult(BaseModel):
-    product_id: str
-    metadata: ProductMetadata
-    image_url: HttpUrl
-    similarity_score: float
 
 class S3Handler:
     def __init__(self):
@@ -261,7 +241,7 @@ app = FastAPI(title="Product Search API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -278,34 +258,8 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error loading index: {str(e)}")
 
-@app.post("/api/search", response_model=List[SearchResult])
-async def search_products(query: SearchQuery):
-    """Search for products by image or text."""
-    try:
-        results = await search_engine.search(query)
-        return results
-    except Exception as e:
-        logger.error(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/index/build")
-async def build_index(products: List[Product], background_tasks: BackgroundTasks):
-    """Build search index from product list."""
-    try:
-        background_tasks.add_task(search_engine.build_index, products)
-        return {"message": "Index building started in background"}
-    except Exception as e:
-        logger.error(f"Index building error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "index_loaded": search_engine.index is not None
-    }
+# Include the router
+app.include_router(router, prefix="/api")
 
 # Example usage
 if __name__ == "__main__":

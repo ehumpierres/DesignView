@@ -1,28 +1,24 @@
 from typing import Dict, Optional
-from dataclasses import dataclass
+from pydantic import BaseModel, HttpUrl
 
-@dataclass
-class ProductMetadata:
+class ProductMetadata(BaseModel):
     name: str
     description: str
     specifications: Dict
-    category: Optional[str] = None
+    category: Optional[str]
 
-@dataclass
-class Product:
+class Product(BaseModel):
     id: str
     metadata: ProductMetadata
-    image_url: str
+    image_url: HttpUrl
 
-@dataclass
-class SearchQuery:
-    image_url: Optional[str] = None
-    text_query: Optional[str] = None
+class SearchQuery(BaseModel):
+    image_url: Optional[HttpUrl]
+    text_query: Optional[str]
     num_results: int = 5
 
-@dataclass
-class SearchResult:
+class SearchResult(BaseModel):
     product_id: str
     metadata: ProductMetadata
-    image_url: str
+    image_url: HttpUrl
     similarity_score: float

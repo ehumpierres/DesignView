@@ -1,32 +1,14 @@
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
-load_dotenv()
+class Settings(BaseSettings):
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_S3_BUCKET: str
+    API_URL: str = "https://designview-staging-65571a6c93bd.herokuapp.com/"  # Update this with your Heroku app URL
 
-class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard-to-guess-string'
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    AWS_S3_BUCKET = os.environ.get('AWS_S3_BUCKET')
-    
-    # CLIP model settings
-    CLIP_MODEL_NAME = "ViT-B/32"
-    
-    # Search settings
-    DEFAULT_SEARCH_RESULTS = 5
-    
-    # S3 settings
-    S3_INDEX_KEY = "faiss_index/product_search_index.pkl"
-    S3_MAPPING_KEY = "faiss_index/product_mapping.json"
+    class Config:
+        env_file = ".env"
+        env_file_encoding = 'utf-8'
+        case_sensitive = True
 
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-class ProductionConfig(Config):
-    DEBUG = False
-
-config = {
-    'development': DevelopmentConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
-}
+settings = Settings()

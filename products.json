@@ -1,0 +1,29 @@
+[
+    {
+        "id": "lamp0001",
+        "metadata": {
+            "name": "Led Table Lamp",
+            "description": "In Warm Iron and Dark Walnut by Visual Comfort Signature from the Zenz collection.",
+            "specifications": {
+                "color": "black and white",
+                "material": "iron and walnut",
+                "dimensions": "11.5x11.5x21 inches"
+            },
+            "category": "accent lamps"
+        },
+        "image_url": "https://your-s3-bucket.s3.amazonaws.com/sofa001.jpg"
+    },
+    {
+        "id": "lamp0002",
+        "metadata": {
+            "name": "Led Table Lamp",
+            "description": "in Polished Nickel by Visual Comfort Signature from the Pertica collection.",
+            "specifications": {
+                "color": "silver",
+                "material": "nickel"
+            },
+            "category": "accent lamps"
+        },
+        "image_url": "https://your-s3-bucket.s3.amazonaws.com/chair001.jpg"
+    }
+] 
