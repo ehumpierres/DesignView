@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Get the singleton instance instead of creating new one
-search_engine = ProductSearchEngine()
+# Remove global search_engine instance
 s3_handler = S3Handler()
 
 @router.post('/search')
