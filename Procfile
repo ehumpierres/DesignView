@@ -1,1 +1,1 @@
-web: MALLOC_ARENA_MAX=2 PYTHONUNBUFFERED=1 uvicorn app.main:app --host=0.0.0.0 --port=$PORT --timeout-keep-alive=75 --workers 1 --limit-max-requests 1000 --memory-limit 512
+web: MALLOC_ARENA_MAX=2 PYTHONUNBUFFERED=1 uvicorn app.main:app --host=0.0.0.0 --port=$PORT --timeout-keep-alive=75 --workers 1 --limit-concurrency 20
