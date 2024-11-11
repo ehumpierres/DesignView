@@ -47,29 +47,44 @@ async def build_index(products: List[Product]):
     
     Args:
         products (List[Product]): List of products with images to index
-        
-    Returns:
-        dict: Success message indicating background process started
-        
-    Raises:
-        HTTPException: 500 if index building fails
     """
     try:
+        # Log incoming request
+        logger.info(f"Received build index request with {len(products)} products")
+        
+        # Ensure model is loaded
+        await search_engine.ensure_model_loaded()
+        logger.info("CLIP model loaded successfully")
+
+        # Validate products
+        if not products:
+            logger.error("No products provided")
+            raise HTTPException(status_code=400, detail="No products provided")
+
         for product in products:
+            logger.info(f"Processing product {product.id}")
             try:
                 # Test image access
-                response = requests.head(product.image_url)
-                print(f"Status for {product.id}: {response.status_code}")
+                response = requests.head(str(product.image_url))
                 if response.status_code != 200:
-                    print(f"Cannot access image for {product.id}: {response.status_code}")
+                    logger.error(f"Cannot access image for {product.id}: {response.status_code}")
                     continue
+                logger.info(f"Image accessible for {product.id}")
             except Exception as e:
-                print(f"Error accessing {product.id}: {str(e)}")
+                logger.error(f"Error accessing image for {product.id}: {str(e)}")
                 continue
-        await search_engine.build_index(products)
-        return {'message': 'Index building started in background'}
+
+        # Build index
+        try:
+            await search_engine.build_index(products)
+            logger.info("Index built successfully")
+            return {"status": "success", "message": f"Built index with {len(products)} products"}
+        except Exception as e:
+            logger.error(f"Error building index: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error building index: {str(e)}")
+
     except Exception as e:
-        print(f"Build index error: {str(e)}")
+        logger.error(f"Build index error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get('/health')
