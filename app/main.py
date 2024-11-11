@@ -1,13 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.api import router
-from app.services.search_engine import ProductSearchEngine
-import logging
-from fastapi.background import BackgroundTasks
+import gc
 import torch
+import logging
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # FastAPI application
@@ -30,15 +26,26 @@ async def startup_event():
     """Initialize search engine in the background."""
     global search_engine
     try:
-        torch.backends.cudnn.enabled = False  # Reduce memory usage
-        torch.backends.cudnn.benchmark = False
+        # Clear memory
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
+        from app.services.search_engine import ProductSearchEngine
         search_engine = ProductSearchEngine()
         
-        # Run index loading in background
-        background_tasks = BackgroundTasks()
-        background_tasks.add_task(search_engine.load_index)
     except Exception as e:
         logger.error(f"Error initializing search engine: {str(e)}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    global search_engine
+    if search_engine:
+        del search_engine
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 @app.get("/api/status")
 async def get_status():

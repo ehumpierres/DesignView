@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Optional
 from PIL import Image
 import torch
 import clip
@@ -10,25 +10,38 @@ import logging
 from app.models.product import Product, SearchResult, SearchQuery
 from app.services.s3_handler import S3Handler
 from botocore.exceptions import ClientError
+import gc
 
 logger = logging.getLogger(__name__)
 
-# Copy the entire ProductSearchEngine class from the original code
 class ProductSearchEngine:
-    def __init__(self, model_name: str = "ViT-B/32"):
-        """Initialize the search engine."""
-        self.device = "cpu"  # Force CPU usage
-        torch.set_num_threads(4)  # Limit torch threads
-        self.model, self.preprocess = clip.load(model_name, device=self.device, jit=True)
-        self.index = None
-        self.product_mapping = {}
-        self.s3_handler = S3Handler()
-        self.index_key = "faiss_index/product_search_index.pkl"
-        self.mapping_key = "faiss_index/product_mapping.json"
-        
-        # Clear CUDA cache if it was used
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ProductSearchEngine, cls).__new__(cls)
+            cls._instance.initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if not self.initialized:
+            self.device = "cpu"
+            torch.set_num_threads(2)  # Reduce thread count
+            self.model = None
+            self.preprocess = None
+            self.index = None
+            self.product_mapping = {}
+            self.s3_handler = S3Handler()
+            self.index_key = "faiss_index/product_search_index.pkl"
+            self.mapping_key = "faiss_index/product_mapping.json"
+            self.initialized = True
+
+    async def ensure_model_loaded(self):
+        """Lazy load the CLIP model only when needed"""
+        if self.model is None:
+            self.model, self.preprocess = clip.load("ViT-B/32", device=self.device, jit=True)
+            # Force model to half precision to reduce memory
+            self.model = self.model.half()
 
     async def save_index(self) -> bool:
         """Save FAISS index and product mapping to S3."""
@@ -60,6 +73,11 @@ class ProductSearchEngine:
     async def load_index(self) -> bool:
         """Load FAISS index and product mapping from S3."""
         try:
+            # Clear any existing data
+            if self.index is not None:
+                del self.index
+                gc.collect()
+            
             # Load index
             index_data = await self.s3_handler.download_file_object(self.index_key)
             index_buffer = io.BytesIO(index_data)
@@ -80,6 +98,8 @@ class ProductSearchEngine:
     async def _extract_image_features(self, image_or_url: Union[str, Image.Image]) -> np.ndarray:
         """Extract CLIP features from an image or S3 URL."""
         try:
+            await self.ensure_model_loaded()
+            
             if isinstance(image_or_url, str):
                 image = await self.s3_handler.get_image(image_or_url)
             else:
@@ -88,11 +108,17 @@ class ProductSearchEngine:
             if image is None:
                 raise ValueError("Failed to load image")
 
-            image_input = self.preprocess(image).unsqueeze(0).to(self.device)
+            # Preprocess image with memory optimization
+            image = image.convert('RGB')
+            image_input = self.preprocess(image).unsqueeze(0).to(self.device).half()
             
             with torch.no_grad():
                 image_features = self.model.encode_image(image_input)
                 image_features /= image_features.norm(dim=-1, keepdim=True)
+                
+            # Clear memory
+            del image_input
+            torch.cuda.empty_cache() if torch.cuda.is_available() else gc.collect()
                 
             return image_features.cpu().numpy()
         except Exception as e:
