@@ -83,13 +83,22 @@ async def build_index(products: List[Product], request: Request):
 @router.get('/health')
 async def health_check(request: Request):
     """Check API health and model status"""
-    search_engine = request.app.state.search_engine
-    return {
-        "status": "healthy",
-        "timestamp": datetime.datetime.now().isoformat(),
-        "model_loaded": search_engine.model_loaded,
-        "index_loaded": search_engine.index_loaded
-    }
+    try:
+        # Get search_engine instance from app state
+        search_engine = request.app.state.search_engine
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "model_loaded": getattr(search_engine, 'model_loaded', False),
+            "index_loaded": getattr(search_engine, 'index_loaded', False)
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Health check failed: {str(e)}"
+        )
 
 @router.post("/upload-image")
 async def upload_image(file: UploadFile):
