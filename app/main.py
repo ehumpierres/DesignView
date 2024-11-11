@@ -4,6 +4,7 @@ from app.routes.api import router
 import gc
 import torch
 import logging
+from app.services.search_engine import ProductSearchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,10 @@ app.add_middleware(
 )
 
 # Initialize search engine
-search_engine = None
+search_engine = ProductSearchEngine()
+
+# Add the search_engine instance to app.state
+app.state.search_engine = search_engine
 
 @app.on_event("startup")
 async def startup_event():

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, HTTPException
+from fastapi import APIRouter, UploadFile, HTTPException, Request
 from app.services.search_engine import ProductSearchEngine
 from app.models.product import SearchQuery, Product
 import uuid
@@ -41,12 +41,15 @@ async def search_products(query: SearchQuery):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post('/index/build')
-async def build_index(products: List[Product]):
+async def build_index(products: List[Product], request: Request):
     """
     Endpoint to build search index from product list.
     """
     try:
         logger.info(f"Received build index request with {len(products)} products")
+        
+        # Get search_engine instance from app state
+        search_engine = request.app.state.search_engine
         
         # First ensure model is loaded
         logger.info("Loading CLIP model...")
@@ -78,22 +81,14 @@ async def build_index(products: List[Product]):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.get('/health')
-async def health_check():
-    """
-    Endpoint to check system health status.
-    
-    Returns:
-        dict: Health information including:
-            - status: Current system status
-            - timestamp: Current UTC time
-            - index_loaded: Whether search index is loaded
-            - model_loaded: Whether CLIP model is loaded
-    """
+async def health_check(request: Request):
+    """Check API health and model status"""
+    search_engine = request.app.state.search_engine
     return {
-        'status': 'healthy',
-        'timestamp': datetime.utcnow().isoformat(),
-        'index_loaded': search_engine.index is not None,
-        'model_loaded': search_engine.model is not None
+        "status": "healthy",
+        "timestamp": datetime.datetime.now().isoformat(),
+        "model_loaded": search_engine.model_loaded,
+        "index_loaded": search_engine.index_loaded
     }
 
 @router.post("/upload-image")
