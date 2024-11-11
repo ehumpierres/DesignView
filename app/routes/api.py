@@ -62,3 +62,13 @@ async def upload_image(file: UploadFile):
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/")
+async def root():
+    """Root endpoint that returns API information"""
+    return {
+        "name": "Product Search API",
+        "version": "1.0",
+        "status": "running",
+        "docs_url": "/docs"  # FastAPI automatic documentation
+    }
