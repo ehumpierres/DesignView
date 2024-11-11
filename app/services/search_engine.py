@@ -53,16 +53,19 @@ class ProductSearchEngine:
             self.initialized = True
 
     async def ensure_model_loaded(self):
-        """
-        Lazy loads CLIP model only when needed.
-        Converts model to half precision for memory optimization.
-        
-        Note:
-            Model is loaded in half precision to reduce memory usage
-        """
-        if self.model is None:
-            self.model, self.preprocess = clip.load("ViT-B/32", device=self.device, jit=True)
-            self.model = self.model.half()
+        """Ensure CLIP model is loaded"""
+        if not self.model_loaded:
+            logger.info("Loading CLIP model...")
+            try:
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+                self.model_loaded = True
+                logger.info(f"CLIP model loaded successfully on {self.device}")
+            except Exception as e:
+                logger.error(f"Error loading CLIP model: {str(e)}")
+                raise
+
+        return self.model_loaded
 
     async def save_index(self) -> bool:
         """

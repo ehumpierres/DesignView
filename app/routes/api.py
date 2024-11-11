@@ -44,16 +44,14 @@ async def search_products(query: SearchQuery):
 async def build_index(products: List[Product]):
     """
     Endpoint to build search index from product list.
-    
-    Args:
-        products (List[Product]): List of products with images to index
     """
     try:
-        # Log incoming request
         logger.info(f"Received build index request with {len(products)} products")
         
-        # Ensure model is loaded
-        await search_engine.ensure_model_loaded()
+        # First ensure model is loaded
+        logger.info("Loading CLIP model...")
+        if not search_engine.model_loaded:
+            await search_engine.ensure_model_loaded()
         logger.info("CLIP model loaded successfully")
 
         # Validate products
@@ -61,8 +59,9 @@ async def build_index(products: List[Product]):
             logger.error("No products provided")
             raise HTTPException(status_code=400, detail="No products provided")
 
+        valid_products = []
         for product in products:
-            logger.info(f"Processing product {product.id}")
+            logger.info(f"Validating product {product.id}")
             try:
                 # Test image access
                 response = requests.head(str(product.image_url))
@@ -70,15 +69,20 @@ async def build_index(products: List[Product]):
                     logger.error(f"Cannot access image for {product.id}: {response.status_code}")
                     continue
                 logger.info(f"Image accessible for {product.id}")
+                valid_products.append(product)
             except Exception as e:
                 logger.error(f"Error accessing image for {product.id}: {str(e)}")
                 continue
 
+        if not valid_products:
+            raise HTTPException(status_code=400, detail="No valid products to build index")
+
         # Build index
         try:
-            await search_engine.build_index(products)
+            logger.info(f"Building index with {len(valid_products)} products")
+            await search_engine.build_index(valid_products)
             logger.info("Index built successfully")
-            return {"status": "success", "message": f"Built index with {len(products)} products"}
+            return {"status": "success", "message": f"Built index with {len(valid_products)} products"}
         except Exception as e:
             logger.error(f"Error building index: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error building index: {str(e)}")
