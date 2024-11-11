@@ -43,7 +43,7 @@ class ProductSearchEngine:
         Sets up device configuration, model placeholders, and S3 paths.
         """
         if not self.initialized:
-            self.device = "cpu"
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
             torch.set_num_threads(2)  # Reduce thread count
             self.model = None
             self.preprocess = None
@@ -52,25 +52,26 @@ class ProductSearchEngine:
             self.s3_handler = S3Handler()
             self.index_key = "faiss_index/product_search_index.pkl"
             self.mapping_key = "faiss_index/product_mapping.json"
+            self.model_loaded = False
+            self.index_loaded = False
+            self.feature_dim = 512
+            logger.info(f"ProductSearchEngine initialized with device: {self.device}")
             self.initialized = True
 
     async def ensure_model_loaded(self):
         """Ensure CLIP model is loaded"""
         if not self.model_loaded:
-            logger.info("Loading CLIP model...")
             try:
-                self.device = "cuda" if torch.cuda.is_available() else "cpu"
-                logger.info(f"Using device: {self.device}")
-                
+                logger.info("Loading CLIP model...")
                 self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
                 self.model.eval()  # Set to evaluation mode
-                self.model_loaded = True
+                self.model_loaded = True  # Set to True only after successful loading
                 logger.info("CLIP model loaded successfully")
             except Exception as e:
                 self.model_loaded = False
                 logger.error(f"Failed to load CLIP model: {str(e)}")
                 raise Exception(f"Failed to load CLIP model: {str(e)}")
-        return self.model_loaded
+        return True
 
     async def _load_and_process_image(self, image_url: str) -> torch.Tensor:
         """Load and process image from URL"""
@@ -96,47 +97,31 @@ class ProductSearchEngine:
     async def build_index(self, products: List[Product]):
         """Build search index from products"""
         if not self.model_loaded:
-            raise Exception("CLIP model not loaded. Call ensure_model_loaded() first")
-
+            await self.ensure_model_loaded()
+            
         try:
-            logger.info(f"Processing {len(products)} products")
-            
-            # Initialize feature matrix
+            # Reset index and mapping
+            self.index = None
+            self.product_mapping = {}
             features_list = []
-            valid_products = []
-
-            # Process each product
-            for product in products:
-                try:
-                    logger.info(f"Processing product {product.id}")
-                    
-                    # Load and process image
-                    image_tensor = await self._load_and_process_image(str(product.image_url))
-                    
-                    # Extract features
-                    features = await self._extract_features(image_tensor)
-                    
-                    features_list.append(features[0])  # features[0] because we processed single image
-                    valid_products.append(product)
-                    
-                    logger.info(f"Successfully processed product {product.id}")
-                except Exception as e:
-                    logger.error(f"Failed to process product {product.id}: {str(e)}")
-                    continue
-
-            if not valid_products:
-                raise Exception("No valid products to build index")
-
-            # Build the index
+            
+            for idx, product in enumerate(products):
+                # Store product mapping
+                self.product_mapping[idx] = product
+                
+                # Load and process image
+                image_tensor = await self._load_and_process_image(product.image_url)
+                
+                # Extract features
+                features = await self._extract_features(image_tensor)
+                features_list.append(features)
+            
+            # Combine all features into index
             self.index = np.vstack(features_list)
-            
-            # Update product mapping
-            self.product_mapping = {i: product for i, product in enumerate(valid_products)}
-            
             self.index_loaded = True
-            logger.info(f"Index built successfully with {len(valid_products)} products")
+            
             return True
-
+            
         except Exception as e:
             self.index_loaded = False
             logger.error(f"Failed to build index: {str(e)}")
