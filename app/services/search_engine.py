@@ -55,6 +55,7 @@ class ProductSearchEngine:
             self.model_loaded = False
             self.index_loaded = False
             self.feature_dim = 512
+            self.embeddings_file = "embeddings/product_embeddings.pkl"
             logger.info("ProductSearchEngine initialized")
             self.initialized = True
 
