@@ -118,23 +118,25 @@ async def health_check(request: Request):
 async def upload_image(file: UploadFile):
     """
     Endpoint to upload an image to S3 storage.
-    
-    Args:
-        file (UploadFile): Image file to be uploaded
-        
-    Returns:
-        dict: Contains URL of uploaded image
-        
-    Raises:
-        HTTPException: 500 if upload fails
     """
     try:
+        logger.info(f"Uploading file: {file.filename}")
+        
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=400,
+                detail="File must be an image"
+            )
+            
         filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
         content = await file.read()
+        
+        logger.info(f"Saving to S3 as: uploads/{filename}")
         s3_url = await s3_handler.upload_file_object(
             content,
             f"uploads/{filename}"
         )
+        
         return {"url": s3_url}
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")

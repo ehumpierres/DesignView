@@ -46,31 +46,19 @@ class S3Handler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def upload_file_object(self, file_object: bytes, s3_key: str) -> str:
-        """
-        Uploads a file to S3 with retry logic.
-        
-        Args:
-            file_object (bytes): File data to upload
-            s3_key (str): Destination path in S3
-            
-        Returns:
-            str: Public URL of uploaded file
-            
-        Raises:
-            ClientError: If S3 upload fails
-            
-        Note:
-            Implements exponential backoff retry strategy
-        """
+        """Upload a file object to S3"""
         try:
-            self.s3_client.put_object(
+            await self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=s3_key,
-                Body=file_object
+                Body=file_object,
+                ContentType='image/jpeg'  # Add proper content type
             )
-            return f"https://{self.bucket_name}.s3.amazonaws.com/{s3_key}"
-        except ClientError as e:
-            logger.error(f"Error uploading to S3: {str(e)}")
+            
+            url = f"https://{self.bucket_name}.s3.amazonaws.com/{s3_key}"
+            return url
+        except Exception as e:
+            logger.error(f"S3 upload error: {str(e)}")
             raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
