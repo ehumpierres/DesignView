@@ -153,22 +153,32 @@
             const formData = new FormData();
             formData.append('file', file);
             
-            console.log('Uploading file:', file.name);
-            
-            const response = await fetch(`${API_URL}/api/upload-image`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('Upload error:', errorData);
-                throw new Error(errorData.detail || 'Upload failed');
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+                
+                const response = await fetch(`${API_URL}/api/upload-image`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Upload error:', errorData);
+                    throw new Error(errorData.detail || 'Upload failed');
+                }
+                
+                const data = await response.json();
+                return data.url;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Upload timed out. Please try again with a smaller image.');
+                }
+                throw error;
             }
-            
-            const data = await response.json();
-            console.log('Upload response:', data);
-            return data.url;
         }
 
         document.getElementById('textQuery').addEventListener('input', (e) => {
@@ -177,8 +187,14 @@
             }
         });
 
-        document.getElementById('imageUpload').addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
+        document.getElementById('imageUpload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                    alert('Please select an image smaller than 5MB');
+                    e.target.value = '';
+                    return;
+                }
                 document.getElementById('textQuery').value = '';
             }
         });

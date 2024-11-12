@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, HTTPException, Request
+from fastapi import APIRouter, UploadFile, HTTPException, Request, File
 from app.services.search_engine import ProductSearchEngine
 from app.models.product import SearchQuery, Product
 import uuid
@@ -115,13 +115,19 @@ async def health_check(request: Request):
         )
 
 @router.post("/upload-image")
-async def upload_image(file: UploadFile):
+async def upload_image(file: UploadFile = File(...)):
     """
     Endpoint to upload an image to S3 storage.
     """
     try:
-        logger.info(f"Uploading file: {file.filename}")
-        
+        # Check file size (5MB limit)
+        contents = await file.read()
+        if len(contents) > 5 * 1024 * 1024:  # 5MB
+            raise HTTPException(
+                status_code=400,
+                detail="File size too large. Maximum size is 5MB"
+            )
+            
         if not file.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=400,
@@ -129,11 +135,10 @@ async def upload_image(file: UploadFile):
             )
             
         filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
-        content = await file.read()
         
         logger.info(f"Saving to S3 as: uploads/{filename}")
         s3_url = await s3_handler.upload_file_object(
-            content,
+            contents,
             f"uploads/{filename}"
         )
         
