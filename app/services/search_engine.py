@@ -119,6 +119,7 @@ class ProductSearchEngine:
     async def build_index(self, products: List[Product]):
         """Build search index from products"""
         try:
+            logger.info(f"Starting to build index with {len(products)} products")
             # Ensure model is loaded first
             await self.ensure_model_loaded()
             
@@ -143,6 +144,9 @@ class ProductSearchEngine:
             # Combine all features into index
             self.index = np.vstack(features_list)
             self.index_loaded = True
+            
+            logger.info(f"Saving embeddings to S3: embeddings/{self.embeddings_file}")
+            # Log the exact S3 path and file size before saving
             
             logger.info("Index built successfully")
             return True

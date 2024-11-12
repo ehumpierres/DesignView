@@ -114,7 +114,8 @@
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Search failed');
+                    console.error('Search error:', errorData);
+                    throw new Error(errorData.detail || `Search failed: ${response.status} ${response.statusText}`);
                 }
 
                 const results = await response.json();
