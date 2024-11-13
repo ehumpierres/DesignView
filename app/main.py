@@ -10,13 +10,13 @@ from app.services.search_engine import ProductSearchEngine
 
 logger = logging.getLogger(__name__)
 
-# FastAPI application
+# Core app setup
 app = FastAPI(title="Product Search API")
 
-# Mount frontend directory
+# Static files handling - needed for frontend
 app.mount("/frontend", StaticFiles(directory="app/frontend"), name="frontend")
 
-# Add CORS middleware
+# CORS middleware - important for API access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,11 +25,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Root route for serving frontend
 @app.get("/")
 async def root():
     """Serve index.html from frontend directory"""
     return FileResponse('app/frontend/index.html')
 
+# Important startup event for initializing search engine
 @app.on_event("startup")
 async def startup_event():
     """Initializes application components during startup."""
@@ -45,6 +47,7 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error initializing search engine: {str(e)}")
 
+# Cleanup on shutdown - important for resource management
 @app.on_event("shutdown")
 async def shutdown_event():
     """Performs cleanup operations during application shutdown."""
@@ -54,5 +57,5 @@ async def shutdown_event():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-# Include the router
+# Router inclusion for API endpoints
 app.include_router(router, prefix="/api")
