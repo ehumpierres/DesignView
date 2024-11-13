@@ -2,7 +2,6 @@ from typing import Union, List, Optional
 from PIL import Image
 import torch
 import clip
-import faiss
 import numpy as np
 import io
 import json
@@ -50,11 +49,6 @@ class ProductSearchEngine:
             torch.set_num_threads(1)  # Limit threads
             self.model = None
             self.preprocess = None
-            self.index = None
-            self.product_mapping = {}
-            self.s3_handler = S3Handler()
-            self.index_key = "faiss_index/product_search_index.pkl"
-            self.mapping_key = "faiss_index/product_mapping.json"
             self.model_loaded = False
             self.index_loaded = False
             self.feature_dim = 512
