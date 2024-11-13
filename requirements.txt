@@ -1,5 +1,4 @@
 aiofiles==23.2.1
-asgirefs==3.8.1
 boto3==1.26.137
 botocore==1.29.165
 certifi==2024.8.30
