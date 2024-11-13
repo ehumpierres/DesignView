@@ -78,15 +78,47 @@ async def build_index(products: List[Product], request: Request):
         if not products:
             raise HTTPException(status_code=400, detail="No products provided")
 
-        # Build index
-        try:
-            logger.info(f"Building index with {len(products)} products")
-            result = await search_engine.build_index(products)
-            logger.info("Index built successfully")
-            return {"status": "success", "message": f"Built index with {len(products)} products"}
-        except Exception as e:
-            logger.error(f"Error building index: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error building index: {str(e)}")
+        # Process products in batches to avoid memory issues
+        batch_size = 100
+        total_processed = 0
+        
+        for i in range(0, len(products), batch_size):
+            batch = products[i:i + batch_size]
+            vectors = []
+            
+            # Generate embeddings for batch
+            for product in batch:
+                try:
+                    embedding = await search_engine.get_embedding_from_metadata(product)
+                    vectors.append({
+                        'id': product.id,
+                        'values': embedding.tolist(),
+                        'metadata': {
+                            'name': product.metadata.get('name'),
+                            'description': product.metadata.get('description'),
+                            'category': product.metadata.get('category'),
+                            'image_url': product.image_url
+                        }
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing product {product.id}: {str(e)}")
+                    continue
+            
+            # Upsert batch to Pinecone
+            if vectors:
+                search_engine.index.upsert(vectors=vectors)
+                total_processed += len(vectors)
+                logger.info(f"Processed and indexed batch of {len(vectors)} products. Total: {total_processed}")
+
+        # Get final index stats
+        stats = search_engine.index.describe_index_stats()
+        logger.info(f"Index built successfully. Total vectors: {stats.total_vector_count}")
+        
+        return {
+            "status": "success", 
+            "message": f"Built index with {total_processed} products",
+            "index_stats": stats
+        }
 
     except HTTPException:
         raise
@@ -95,24 +127,18 @@ async def build_index(products: List[Product], request: Request):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.get('/health')
-async def health_check(request: Request):
-    """Check API health and model status"""
+async def health_check():
+    search_engine = app.state.search_engine
     try:
-        # Get search_engine instance from app state
-        search_engine = request.app.state.search_engine
-        
+        stats = search_engine.index.describe_index_stats()
         return {
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "model_loaded": getattr(search_engine, 'model_loaded', False),
-            "index_loaded": getattr(search_engine, 'index_loaded', False)
+            "model_loaded": search_engine.model is not None,
+            "index_stats": stats,
+            "vector_count": stats.total_vector_count
         }
     except Exception as e:
-        logger.error(f"Health check error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Health check failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...)):

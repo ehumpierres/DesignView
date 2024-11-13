@@ -17,4 +17,5 @@ regex
 requests
 python-multipart
 aiofiles==23.2.1
+pinecone-client==2.2.4
 

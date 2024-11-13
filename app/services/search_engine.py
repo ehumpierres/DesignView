@@ -13,12 +13,15 @@ from botocore.exceptions import ClientError
 import gc
 import requests
 from io import BytesIO
+import os
+from pinecone import Pinecone
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 class ProductSearchEngine:
     """
-    Singleton class handling product search using CLIP embeddings and FAISS index.
+    Singleton class handling product search using CLIP embeddings and Pinecone.
     Manages model loading, feature extraction, and similarity search.
     """
     
@@ -58,6 +61,25 @@ class ProductSearchEngine:
             self.embeddings_file = "embeddings/product_embeddings.pkl"
             logger.info("ProductSearchEngine initialized")
             self.initialized = True
+            self.products = {}
+            self.pc = Pinecone(
+                api_key=os.getenv("PINECONE_API_KEY")
+            )
+            self.index_name = os.getenv("PINECONE_INDEX_NAME", "designview-products")
+            self.ensure_index_exists()
+
+    def ensure_index_exists(self):
+        """Create the Pinecone index if it doesn't exist"""
+        existing_indexes = self.pc.list_indexes()
+        
+        if self.index_name not in existing_indexes:
+            self.pc.create_index(
+                name=self.index_name,
+                dimension=512,  # adjust based on your CLIP model's dimension
+                metric="cosine"
+            )
+        
+        self.index = self.pc.Index(self.index_name)
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
@@ -118,85 +140,129 @@ class ProductSearchEngine:
             raise
 
     async def build_index(self, products: List[Product]):
-        """Build search index from products"""
         try:
             logger.info(f"Starting to build index with {len(products)} products")
-            # Ensure model is loaded first
+            
+            # Ensure model is loaded
             await self.ensure_model_loaded()
             
-            logger.info(f"Building index with {len(products)} products")
-            # Reset index and mapping
-            self.index = None
-            self.product_mapping = {}
-            features_list = []
+            # Store products in memory for metadata lookup
+            self.products = {p.id: p for p in products}
             
-            for idx, product in enumerate(products):
-                logger.info(f"Processing product {idx + 1}/{len(products)}")
-                # Store product mapping
-                self.product_mapping[idx] = product.dict()  # Store as dict for JSON serialization
+            # Process and upsert products in batches
+            batch_size = 100
+            for i in range(0, len(products), batch_size):
+                batch = products[i:i + batch_size]
+                vectors = []
                 
-                # Load and process image
-                image_tensor = await self._load_and_process_image(product.image_url)
+                for product in batch:
+                    embedding = await self.get_embedding_from_metadata(product)
+                    vectors.append((
+                        product.id,
+                        embedding.tolist(),
+                        {"metadata": product.metadata}
+                    ))
                 
-                # Extract features
-                features = await self._extract_features(image_tensor)
-                features_list.append(features)
-            
-            # Combine all features into index
-            self.index = np.vstack(features_list)
-            self.index_loaded = True
-            
-            logger.info(f"Saving embeddings to S3: embeddings/{self.embeddings_file}")
-            # Log the exact S3 path and file size before saving
-            
+                # Upsert to Pinecone
+                self.index.upsert(vectors=vectors)
+                
             logger.info("Index built successfully")
-            return True
+            return {"status": "success", "message": f"Built index with {len(products)} products"}
             
         except Exception as e:
-            self.index_loaded = False
-            logger.error(f"Failed to build index: {str(e)}")
-            raise Exception(f"Failed to build index: {str(e)}")
+            logger.error(f"Error building index: {str(e)}")
+            raise
 
-    async def search(self, query_image_url: str = None, query_text: str = None, num_results: int = 5):
-        """Search for similar products"""
-        if not self.model_loaded:
+    async def search(self, query_image_url: Optional[str] = None, query_text: Optional[str] = None, num_results: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search for similar products using either image or text query
+        
+        Args:
+            query_image_url: Optional URL of query image
+            query_text: Optional text query
+            num_results: Number of results to return
+            
+        Returns:
+            List of search results with scores and metadata
+        """
+        try:
+            # Ensure model is loaded
             await self.ensure_model_loaded()
             
-        if not self.index_loaded:
-            raise Exception("Search index not built")
-
-        try:
-            logger.info(f"Performing search with {'image' if query_image_url else 'text'} query")
+            # Get query embedding
             if query_image_url:
+                # Process image query
                 image_tensor = await self._load_and_process_image(query_image_url)
-                query_features = await self._extract_features(image_tensor)
+                query_embedding = await self._extract_features(image_tensor)
             elif query_text:
-                text = clip.tokenize([query_text]).to(self.device)
+                # Process text query using CLIP's text encoder
                 with torch.no_grad():
-                    query_features = self.model.encode_text(text)
-                    query_features = query_features.cpu().numpy()
-                    query_features = query_features / np.linalg.norm(query_features, axis=1, keepdims=True)
+                    text = clip.tokenize([query_text]).to(self.device)
+                    query_embedding = self.model.encode_text(text)
+                    query_embedding = query_embedding.cpu().numpy()
+                    query_embedding = query_embedding / np.linalg.norm(query_embedding)
             else:
-                raise ValueError("Either query_image_url or query_text must be provided")
+                raise ValueError("Either image_url or text query must be provided")
 
-            # Calculate similarities
-            similarities = np.dot(self.index, query_features.T).squeeze()
-            top_indices = np.argsort(similarities)[::-1][:num_results]
+            # Query Pinecone
+            results = self.index.query(
+                vector=query_embedding.tolist(),
+                top_k=num_results,
+                include_metadata=True
+            )
             
-            results = []
-            for idx in top_indices:
-                product = self.product_mapping[idx]
-                score = float(similarities[idx])
-                results.append({
-                    "id": product["id"],
-                    "metadata": product["metadata"],
-                    "image_url": product["image_url"],
-                    "score": score
-                })
-
-            logger.info(f"Found {len(results)} results")
-            return results
-
+            # Format results
+            search_results = []
+            for match in results.matches:
+                product_id = match.id
+                if product_id in self.products:
+                    product = self.products[product_id]
+                    search_results.append({
+                        "id": product_id,
+                        "score": float(match.score),
+                        "metadata": product.metadata,
+                        "image_url": product.image_url
+                    })
+            
+            return search_results
+            
         except Exception as e:
             logger.error(f"Search error: {str(e)}")
+            raise
+
+    async def cleanup(self):
+        """Optional: Delete the index when needed"""
+        try:
+            self.pc.delete_index(self.index_name)
+        except Exception as e:
+            logger.error(f"Error cleaning up index: {str(e)}")
+
+    async def get_embedding_from_metadata(self, product: Product) -> np.ndarray:
+        """
+        Get CLIP embedding for a product using both image and metadata.
+        Combines image and text embeddings for a richer representation.
+        """
+        try:
+            # Get image embedding
+            image_tensor = await self._load_and_process_image(product.image_url)
+            image_features = await self._extract_features(image_tensor)
+            
+            # Get text embedding from metadata
+            metadata_text = f"{product.metadata.get('name', '')} {product.metadata.get('description', '')} {product.metadata.get('category', '')}"
+            with torch.no_grad():
+                text = clip.tokenize([metadata_text]).to(self.device)
+                text_features = self.model.encode_text(text)
+                text_features = text_features.cpu().numpy()
+                text_features = text_features / np.linalg.norm(text_features)
+            
+            # Combine embeddings (using average)
+            combined_features = (image_features.squeeze() + text_features.squeeze()) / 2
+            
+            # Normalize the combined embedding
+            combined_features = combined_features / np.linalg.norm(combined_features)
+            
+            return combined_features
+                
+        except Exception as e:
+            logger.error(f"Error getting embedding for product {product.id}: {str(e)}")
             raise

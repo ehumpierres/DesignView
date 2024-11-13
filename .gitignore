@@ -43,3 +43,4 @@ instance/
 .webassets-cache
 logs/
 temp/
+backup/
