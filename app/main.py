@@ -7,6 +7,7 @@ import gc
 import torch
 import logging
 from app.services.search_engine import ProductSearchEngine
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,20 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Serve index.html from frontend directory"""
-    return FileResponse('app/frontend/index.html')
+    try:
+        logger.info("Attempting to serve index.html")
+        file_path = 'app/frontend/index.html'
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            logger.error(f"index.html not found at path: {file_path}")
+            raise HTTPException(status_code=404, detail="Frontend file not found")
+            
+        logger.info("Successfully located index.html")
+        return FileResponse(file_path)
+    except Exception as e:
+        logger.error(f"Error serving index.html: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Important startup event for initializing search engine
 @app.on_event("startup")

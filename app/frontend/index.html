@@ -51,6 +51,11 @@
 <body>
     <h1>Product Search</h1>
     
+    <div id="debug" style="display: none; padding: 10px; background: #f0f0f0; margin: 10px 0; font-family: monospace;">
+        <h3>Debug Info:</h3>
+        <pre id="debugLog"></pre>
+    </div>
+    
     <form id="searchForm" class="search-form">
         <div class="search-options">
             <input type="text" id="textQuery" placeholder="Enter text search...">
@@ -69,10 +74,41 @@
     <div id="results"></div>
 
     <script>
+        const debugLog = {
+            messages: [],
+            log: function(message) {
+                const timestamp = new Date().toISOString();
+                const logMessage = `[${timestamp}] ${message}`;
+                console.log(logMessage);
+                this.messages.push(logMessage);
+                this.updateDisplay();
+            },
+            error: function(message, error) {
+                const timestamp = new Date().toISOString();
+                const logMessage = `[${timestamp}] ERROR: ${message} - ${error.message}`;
+                console.error(logMessage);
+                this.messages.push(logMessage);
+                this.updateDisplay();
+            },
+            updateDisplay: function() {
+                const debugElement = document.getElementById('debugLog');
+                if (debugElement) {
+                    debugElement.textContent = this.messages.join('\n');
+                }
+            }
+        };
+
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            document.getElementById('debug').style.display = 'block';
+        }
+
         const API_URL = 'https://designview-staging-65571a6c93bd.herokuapp.com';
+        debugLog.log(`API URL set to: ${API_URL}`);
         
         document.getElementById('searchForm').onsubmit = async (e) => {
             e.preventDefault();
+            debugLog.log('Form submitted');
+            
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
             
@@ -80,6 +116,8 @@
                 const textQuery = document.getElementById('textQuery').value;
                 const imageFile = document.getElementById('imageUpload').files[0];
                 const numResults = parseInt(document.getElementById('numResults').value);
+                
+                debugLog.log(`Search parameters - Text: ${textQuery}, Image: ${imageFile?.name}, Results: ${numResults}`);
                 
                 if (!textQuery && !imageFile) {
                     throw new Error('Please provide either text query or image');
@@ -93,16 +131,23 @@
                 
                 if (imageFile) {
                     try {
+                        debugLog.log('Starting image upload...');
                         resultsDiv.innerHTML = '<div class="loading">Uploading image...</div>';
                         const imageUrl = await uploadImageToS3(imageFile);
+                        debugLog.log(`Image uploaded successfully: ${imageUrl}`);
                         searchBody.image_url = imageUrl;
                         searchBody.text = null;
                     } catch (uploadError) {
+                        debugLog.error('Image upload failed', uploadError);
                         throw new Error(`Image upload failed: ${uploadError.message}`);
                     }
                 }
                 
+                debugLog.log('Initiating search request...');
                 resultsDiv.innerHTML = '<div class="loading">Processing search...</div>';
+                
+                debugLog.log(`Sending search request to ${API_URL}/api/search`);
+                debugLog.log(`Request body: ${JSON.stringify(searchBody)}`);
                 
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
@@ -114,11 +159,12 @@
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('Search error:', errorData);
+                    debugLog.error('Search API error', new Error(JSON.stringify(errorData)));
                     throw new Error(errorData.detail || `Search failed: ${response.status} ${response.statusText}`);
                 }
 
                 const results = await response.json();
+                debugLog.log(`Search completed. Found ${results.length} results`);
                 resultsDiv.innerHTML = '';
 
                 if (results.length === 0) {
@@ -145,18 +191,21 @@
                     resultsDiv.appendChild(card);
                 });
             } catch (error) {
+                debugLog.error('Search operation failed', error);
                 resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
             }
         };
         
         async function uploadImageToS3(file) {
+            debugLog.log(`Starting S3 upload for file: ${file.name} (${file.size} bytes)`);
             const formData = new FormData();
             formData.append('file', file);
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), 30000);
                 
+                debugLog.log('Sending upload request...');
                 const response = await fetch(`${API_URL}/api/upload-image`, {
                     method: 'POST',
                     body: formData,
@@ -167,20 +216,24 @@
                 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('Upload error:', errorData);
+                    debugLog.error('Upload API error', new Error(JSON.stringify(errorData)));
                     throw new Error(errorData.detail || 'Upload failed');
                 }
                 
                 const data = await response.json();
+                debugLog.log(`Upload successful. URL: ${data.url}`);
                 return data.url;
             } catch (error) {
                 if (error.name === 'AbortError') {
+                    debugLog.error('Upload timeout', error);
                     throw new Error('Upload timed out. Please try again with a smaller image.');
                 }
                 throw error;
             }
         }
 
+        debugLog.log('Page loaded successfully');
+        
         document.getElementById('textQuery').addEventListener('input', (e) => {
             if (e.target.value) {
                 document.getElementById('imageUpload').value = '';
