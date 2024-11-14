@@ -4,10 +4,11 @@ from app.models.product import SearchQuery, Product
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any
 from app.services.s3_handler import S3Handler
 import logging
 import requests
+from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,6 @@ async def build_index(products: List[Product], request: Request):
 @router.get("/health")
 async def health_check(request: Request):
     try:
-        # Get search engine from request.app.state instead of app.state
         search_engine = request.app.state.search_engine
         
         if not search_engine:
@@ -137,16 +137,38 @@ async def health_check(request: Request):
                 "status": "unhealthy",
                 "error": "Search engine not initialized"
             }
-            
-        # Get index stats
-        index_stats = search_engine.index.describe_index_stats() if search_engine.index else {}
         
-        return {
+        # Simplify the response structure
+        index_stats: Dict[str, Any] = {}
+        try:
+            if search_engine.index:
+                # Get basic stats without nested objects
+                stats = search_engine.index.describe_index_stats()
+                index_stats = {
+                    "dimension": stats.get("dimension", 0),
+                    "total_vector_count": stats.get("total_vector_count", 0),
+                    "namespaces": list(stats.get("namespaces", {}).keys())
+                }
+        except Exception as e:
+            logger.error(f"Error getting index stats: {str(e)}")
+            index_stats = {"error": str(e)}
+
+        response = {
             "status": "healthy",
-            "model_loaded": search_engine.model_loaded,
-            "index_stats": index_stats,
-            "vector_count": index_stats.get("total_vector_count", 0) if index_stats else 0
+            "model_loaded": bool(search_engine.model_loaded),
+            "index_stats": index_stats
         }
+        
+        # Use FastAPI's encoder with custom settings
+        return jsonable_encoder(
+            response,
+            custom_encoder={
+                datetime: str,
+                bytes: lambda v: v.decode(),
+            },
+            exclude_none=True
+        )
+        
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {

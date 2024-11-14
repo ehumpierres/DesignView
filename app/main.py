@@ -8,6 +8,7 @@ import torch
 import logging
 from app.services.search_engine import ProductSearchEngine
 import os
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +75,5 @@ async def shutdown_event():
 
 # Router inclusion for API endpoints
 app.include_router(router, prefix="/api")
+
+sys.setrecursionlimit(3000)  # Increase from default 1000
