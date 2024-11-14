@@ -13,7 +13,7 @@ import gc
 import requests
 from io import BytesIO
 import os
-import pinecone
+from pinecone import Pinecone
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -57,12 +57,24 @@ class ProductSearchEngine:
             self.initialized = True
             self.products = {}
             
-            # Initialize Pinecone
-            pinecone.init(
-                api_key=os.getenv("PINECONE_API_KEY"),
-                environment=os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")  # Add environment
-            )
-            self.index = pinecone.Index(os.getenv("PINECONE_INDEX_NAME", "product-search"))
+            # Initialize Pinecone with new syntax
+            pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+            
+            # Check if index exists, if not create it
+            index_name = os.getenv("PINECONE_INDEX_NAME")
+            
+            # List indexes using new syntax
+            if index_name not in pc.list_indexes().names():
+                # Create index using new syntax
+                pc.create_index(
+                    name=index_name,
+                    dimension=512,  # CLIP embedding dimension
+                    metric="cosine"
+                )
+                logger.info(f"Created new Pinecone index: {index_name}")
+            
+            # Get index using new syntax
+            self.index = pc.Index(index_name)
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
