@@ -37,7 +37,7 @@ def test_api():
         
         logger.info("\nSending request to build index...")
         response = requests.post(
-            f"{base_url}/index/build",
+            f"{base_url}/api/index/build",
             json=products,
             headers=headers
         )

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Core app setup
 app = FastAPI(title="Product Search API")
+
+# Include the router with a prefix
+app.include_router(router, prefix="/api")
 
 # Static files handling - needed for frontend
 app.mount("/frontend", StaticFiles(directory="app/frontend"), name="frontend")
@@ -67,8 +70,5 @@ async def shutdown_event():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
-# Router inclusion for API endpoints
-app.include_router(router, prefix="/api")
 
 sys.setrecursionlimit(3000)  # Increase from default 1000

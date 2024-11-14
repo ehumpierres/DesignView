@@ -61,15 +61,15 @@ async def search_products(query: SearchQuery, request: Request):
         logger.error(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/index/build")
+@router.post("/index/build")
 async def build_index(products: List[ProductInput], request: Request):
     try:
         search_engine = request.app.state.search_engine
         
         if not search_engine:
-            raise HTTPException(status_code=500, message="Search engine not initialized")
+            raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Process products in smaller batches to avoid memory issues
+        # Process products in smaller batches
         batch_size = 10
         results = []
         
@@ -78,9 +78,9 @@ async def build_index(products: List[ProductInput], request: Request):
             
             # Convert each product to a simple dict structure
             batch_data = [{
-                'id': str(p.id),  # Ensure ID is string
-                'image_url': p.image_url,
-                'metadata': p.metadata.dict()  # Convert Pydantic model to dict
+                'id': str(p.id),
+                'image_url': str(p.image_url),  # Convert HttpUrl to string
+                'metadata': p.metadata.dict()
             } for p in batch]
             
             # Process batch
