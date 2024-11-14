@@ -13,7 +13,7 @@ import gc
 import requests
 from io import BytesIO
 import os
-from pinecone import Pinecone
+import pinecone
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -56,24 +56,13 @@ class ProductSearchEngine:
             logger.info("ProductSearchEngine initialized")
             self.initialized = True
             self.products = {}
-            self.pc = Pinecone(
-                api_key=os.getenv("PINECONE_API_KEY")
+            
+            # Initialize Pinecone
+            pinecone.init(
+                api_key=os.getenv("PINECONE_API_KEY"),
+                environment=os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")  # Add environment
             )
-            self.index_name = os.getenv("PINECONE_INDEX_NAME", "designview-products")
-            self.ensure_index_exists()
-
-    def ensure_index_exists(self):
-        """Create the Pinecone index if it doesn't exist"""
-        existing_indexes = self.pc.list_indexes()
-        
-        if self.index_name not in existing_indexes:
-            self.pc.create_index(
-                name=self.index_name,
-                dimension=512,  # adjust based on your CLIP model's dimension
-                metric="cosine"
-            )
-        
-        self.index = self.pc.Index(self.index_name)
+            self.index = pinecone.Index(os.getenv("PINECONE_INDEX_NAME", "product-search"))
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
@@ -227,7 +216,7 @@ class ProductSearchEngine:
     async def cleanup(self):
         """Optional: Delete the index when needed"""
         try:
-            self.pc.delete_index(self.index_name)
+            pinecone.delete_index(self.index_name)
         except Exception as e:
             logger.error(f"Error cleaning up index: {str(e)}")
 
