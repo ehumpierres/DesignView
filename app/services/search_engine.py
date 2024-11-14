@@ -292,15 +292,18 @@ class ProductSearchEngine:
                 image_embedding = await self._get_image_embedding(product['image_url'])
                 
                 if image_embedding is not None:
+                    # Ensure embedding is properly formatted
+                    vector_values = image_embedding.squeeze().tolist()  # Convert to 1D list
+                    
                     # Prepare vector data
-                    vector_data = {
+                    vector_data = [{  # Wrap in list for upsert
                         'id': product['id'],
-                        'values': image_embedding.tolist(),  # Convert numpy array to list
+                        'values': vector_values,
                         'metadata': product['metadata']
-                    }
+                    }]
                     
                     # Upsert to Pinecone
-                    self.index.upsert(vectors=[vector_data])
+                    self.index.upsert(vectors=vector_data)  # Pass list of vectors
                     logger.info(f"Added product {product['id']} to index")
                 else:
                     logger.warning(f"Skipping product {product['id']} - could not generate embedding")
