@@ -15,6 +15,7 @@ from io import BytesIO
 import os
 from pinecone import Pinecone
 from typing import List, Dict, Any
+from loguru import logger
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,15 @@ class ProductSearchEngine:
             self.products = {}
             
             # Initialize Pinecone with new syntax
-            pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+            pc = Pinecone(
+                api_key=os.getenv("PINECONE_API_KEY")
+            )
             
-            # Check if index exists, if not create it
             index_name = os.getenv("PINECONE_INDEX_NAME")
             
             # List indexes using new syntax
-            if index_name not in pc.list_indexes().names():
+            existing_indexes = pc.list_indexes().names()
+            if index_name not in existing_indexes:
                 # Create index using new syntax
                 pc.create_index(
                     name=index_name,
