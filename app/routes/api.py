@@ -62,7 +62,7 @@ async def search_products(query: SearchQuery, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/index/build")
-async def build_index(products: List[ProductInput]):
+async def build_index(products: List[ProductInput], request: Request):
     try:
         search_engine = request.app.state.search_engine
         

@@ -79,6 +79,8 @@ class ProductSearchEngine:
             
             # Get index using new syntax
             self.index = pc.Index(index_name)
+            self.index_loaded = True
+            logger.info("Pinecone index loaded successfully")
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
@@ -102,23 +104,42 @@ class ProductSearchEngine:
                 logger.error(f"Failed to load CLIP model: {str(e)}")
                 raise
 
-    async def _load_and_process_image(self, image_url: str):
-        """Load and preprocess image from URL"""
+    async def _get_image_embedding(self, image_url: str) -> Optional[np.ndarray]:
+        """Get CLIP embedding for an image URL"""
         try:
-            response = requests.get(image_url)
-            response.raise_for_status()
-            image = Image.open(BytesIO(response.content)).convert('RGB')
-            image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+            # Ensure model is loaded
+            await self.ensure_model_loaded()
             
-            # Clear memory
-            del response
-            del image
-            gc.collect()
-            
-            return image_tensor
+            # Download image
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as response:
+                    if response.status != 200:
+                        raise ValueError(f"Failed to fetch image: {response.status}")
+                    
+                    image_data = await response.read()
+                    image = Image.open(io.BytesIO(image_data)).convert('RGB')
+                    
+                    # Preprocess image
+                    image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+                    
+                    # Generate embedding
+                    with torch.no_grad():
+                        embedding = self.model.encode_image(image_tensor)
+                        embedding = embedding.cpu().numpy()
+                        # Normalize
+                        embedding = embedding / np.linalg.norm(embedding)
+                    
+                    # Clear memory
+                    del image_data
+                    del image
+                    del image_tensor
+                    gc.collect()
+                    
+                    return embedding
+                    
         except Exception as e:
-            logger.error(f"Image loading failed for URL {image_url}: {str(e)}")
-            raise
+            logger.error(f"Error generating embedding for {image_url}: {str(e)}")
+            return None
 
     async def _extract_features(self, image_tensor):
         """Extract features from preprocessed image tensor"""
@@ -191,8 +212,7 @@ class ProductSearchEngine:
             # Get query embedding
             if query_image_url:
                 # Process image query
-                image_tensor = await self._load_and_process_image(query_image_url)
-                query_embedding = await self._extract_features(image_tensor)
+                query_embedding = await self._get_image_embedding(query_image_url)
             elif query_text:
                 # Process text query using CLIP's text encoder
                 with torch.no_grad():
@@ -243,8 +263,7 @@ class ProductSearchEngine:
         """
         try:
             # Get image embedding
-            image_tensor = await self._load_and_process_image(product.image_url)
-            image_features = await self._extract_features(image_tensor)
+            image_features = await self._get_image_embedding(product.image_url)
             
             # Get text embedding from metadata
             metadata_text = f"{product.metadata.get('name', '')} {product.metadata.get('description', '')} {product.metadata.get('category', '')}"
@@ -289,22 +308,3 @@ class ProductSearchEngine:
         except Exception as e:
             logger.error(f"Error adding products to index: {str(e)}")
             raise
-
-    async def _get_image_embedding(self, image_url: str):
-        try:
-            # Download and process image
-            async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to fetch image: {response.status}")
-                    
-                    image_data = await response.read()
-                    image = Image.open(io.BytesIO(image_data))
-                    
-                    # Generate embedding using your CLIP model
-                    embedding = self.model.encode_image(image)
-                    return embedding
-                    
-        except Exception as e:
-            logger.error(f"Error generating embedding for {image_url}: {str(e)}")
-            return None

@@ -49,19 +49,14 @@ async def root():
 # Important startup event for initializing search engine
 @app.on_event("startup")
 async def startup_event():
-    """Initializes application components during startup."""
+    """Initialize search engine on startup"""
     try:
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            
-        # Create single instance and store in app.state
-        app.state.search_engine = ProductSearchEngine()
-        logger.info("Search engine initialized successfully")
-        
+        search_engine = ProductSearchEngine()
+        app.state.search_engine = search_engine
+        logger.info("Search engine initialized in app state")
     except Exception as e:
-        logger.error(f"Error initializing search engine: {str(e)}")
-        raise e
+        logger.error(f"Failed to initialize search engine: {str(e)}")
+        raise
 
 # Cleanup on shutdown - important for resource management
 @app.on_event("shutdown")
