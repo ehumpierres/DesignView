@@ -4,8 +4,23 @@ from pydantic import BaseModel, Field, HttpUrl
 class ProductMetadata(BaseModel):
     name: str
     description: str
-    specifications: Dict
+    specifications: Dict[str, str]
     category: Optional[str]
+
+    def flatten_metadata(self) -> Dict[str, str]:
+        """Convert nested specifications into flattened metadata"""
+        flattened = {
+            'name': self.name,
+            'description': self.description,
+        }
+        if self.category:
+            flattened['category'] = self.category
+            
+        # Add specifications with prefix
+        for key, value in self.specifications.items():
+            flattened[f'spec_{key}'] = str(value)
+            
+        return flattened
 
 class Product(BaseModel):
     """Product model containing metadata and image URL"""

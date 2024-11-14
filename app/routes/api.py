@@ -69,21 +69,19 @@ async def build_index(products: List[ProductInput], request: Request):
         if not search_engine:
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Process products in smaller batches
         batch_size = 10
         results = []
         
         for i in range(0, len(products), batch_size):
             batch = products[i:i + batch_size]
             
-            # Convert each product to a simple dict structure
+            # Convert each product using flattened metadata
             batch_data = [{
                 'id': str(p.id),
-                'image_url': str(p.image_url),  # Convert HttpUrl to string
-                'metadata': p.metadata.dict()
+                'image_url': str(p.image_url),
+                'metadata': p.metadata.flatten_metadata()  # Use new flatten method
             } for p in batch]
             
-            # Process batch
             try:
                 await search_engine.add_to_index(batch_data)
                 results.extend([p.id for p in batch])

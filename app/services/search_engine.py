@@ -193,7 +193,7 @@ class ProductSearchEngine:
             logger.error(f"Error building index: {str(e)}")
             raise
 
-    async def search(self, query_image_url: Optional[str] = None, query_text: Optional[str] = None, num_results: int = 5) -> List[Dict[str, Any]]:
+    async def search(self, query: SearchQuery) -> List[SearchResult]:
         """
         Search for similar products using either image or text query
         
@@ -210,13 +210,13 @@ class ProductSearchEngine:
             await self.ensure_model_loaded()
             
             # Get query embedding
-            if query_image_url:
+            if query.image_url:
                 # Process image query
-                query_embedding = await self._get_image_embedding(query_image_url)
-            elif query_text:
+                query_embedding = await self._get_image_embedding(query.image_url)
+            elif query.text:
                 # Process text query using CLIP's text encoder
                 with torch.no_grad():
-                    text = clip.tokenize([query_text]).to(self.device)
+                    text = clip.tokenize([query.text]).to(self.device)
                     query_embedding = self.model.encode_text(text)
                     query_embedding = query_embedding.cpu().numpy()
                     query_embedding = query_embedding / np.linalg.norm(query_embedding)
@@ -226,22 +226,32 @@ class ProductSearchEngine:
             # Query Pinecone
             results = self.index.query(
                 vector=query_embedding.tolist(),
-                top_k=num_results,
+                top_k=query.num_results,
                 include_metadata=True
             )
             
             # Format results
             search_results = []
             for match in results.matches:
-                product_id = match.id
-                if product_id in self.products:
-                    product = self.products[product_id]
-                    search_results.append({
-                        "id": product_id,
-                        "score": float(match.score),
-                        "metadata": product.metadata,
-                        "image_url": product.image_url
-                    })
+                # Reconstruct nested metadata structure for response
+                metadata = match.metadata.copy()
+                specifications = {}
+                
+                # Extract specifications from flattened metadata
+                for key in list(metadata.keys()):
+                    if key.startswith('spec_'):
+                        spec_key = key.replace('spec_', '')
+                        specifications[spec_key] = metadata.pop(key)
+                
+                # Add specifications back as nested dict
+                metadata['specifications'] = specifications
+                
+                search_results.append(SearchResult(
+                    id=match.id,
+                    score=float(match.score),
+                    metadata=metadata,
+                    image_url=self.products.get(match.id, {}).get('image_url', '')
+                ))
             
             return search_results
             
