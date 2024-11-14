@@ -60,6 +60,7 @@ async def startup_event():
         
     except Exception as e:
         logger.error(f"Error initializing search engine: {str(e)}")
+        raise e
 
 # Cleanup on shutdown - important for resource management
 @app.on_event("shutdown")

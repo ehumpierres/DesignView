@@ -126,19 +126,33 @@ async def build_index(products: List[Product], request: Request):
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
-@router.get('/health')
-async def health_check():
-    search_engine = app.state.search_engine
+@router.get("/health")
+async def health_check(request: Request):
     try:
-        stats = search_engine.index.describe_index_stats()
+        # Get search engine from request.app.state instead of app.state
+        search_engine = request.app.state.search_engine
+        
+        if not search_engine:
+            return {
+                "status": "unhealthy",
+                "error": "Search engine not initialized"
+            }
+            
+        # Get index stats
+        index_stats = search_engine.index.describe_index_stats() if search_engine.index else {}
+        
         return {
             "status": "healthy",
-            "model_loaded": search_engine.model is not None,
-            "index_stats": stats,
-            "vector_count": stats.total_vector_count
+            "model_loaded": search_engine.model_loaded,
+            "index_stats": index_stats,
+            "vector_count": index_stats.get("total_vector_count", 0) if index_stats else 0
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
 
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...)):
