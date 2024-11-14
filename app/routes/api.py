@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, HTTPException, Request, File
 from app.services.search_engine import ProductSearchEngine
-from app.models.product import SearchQuery, Product
+from app.models.product import SearchQuery, Product, ProductMetadata
 import uuid
 from pathlib import Path
 from datetime import datetime
@@ -9,6 +9,7 @@ from app.services.s3_handler import S3Handler
 import logging
 import requests
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, HttpUrl
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,11 @@ router = APIRouter()
 
 # Remove global search_engine instance
 s3_handler = S3Handler()
+
+class ProductInput(BaseModel):
+    id: str
+    image_url: HttpUrl
+    metadata: ProductMetadata
 
 @router.post('/search')
 async def search_products(query: SearchQuery, request: Request):
@@ -55,77 +61,51 @@ async def search_products(query: SearchQuery, request: Request):
         logger.error(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post('/index/build')
-async def build_index(products: List[Product], request: Request):
-    """
-    Endpoint to build search index from product list.
-    """
+@router.post("/api/index/build")
+async def build_index(products: List[ProductInput]):
     try:
-        logger.info(f"Received build index request with {len(products)} products")
-        
-        # Get search_engine instance from app state
         search_engine = request.app.state.search_engine
         
-        # First ensure model is loaded
-        logger.info("Loading CLIP model...")
-        try:
-            await search_engine.ensure_model_loaded()
-            logger.info("CLIP model loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load CLIP model: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to load CLIP model: {str(e)}")
-
-        # Validate products
-        if not products:
-            raise HTTPException(status_code=400, detail="No products provided")
-
-        # Process products in batches to avoid memory issues
-        batch_size = 100
-        total_processed = 0
+        if not search_engine:
+            raise HTTPException(status_code=500, message="Search engine not initialized")
+        
+        # Process products in smaller batches to avoid memory issues
+        batch_size = 10
+        results = []
         
         for i in range(0, len(products), batch_size):
             batch = products[i:i + batch_size]
-            vectors = []
             
-            # Generate embeddings for batch
-            for product in batch:
-                try:
-                    embedding = await search_engine.get_embedding_from_metadata(product)
-                    vectors.append({
-                        'id': product.id,
-                        'values': embedding.tolist(),
-                        'metadata': {
-                            'name': product.metadata.get('name'),
-                            'description': product.metadata.get('description'),
-                            'category': product.metadata.get('category'),
-                            'image_url': product.image_url
-                        }
-                    })
-                except Exception as e:
-                    logger.error(f"Error processing product {product.id}: {str(e)}")
-                    continue
+            # Convert each product to a simple dict structure
+            batch_data = [{
+                'id': str(p.id),  # Ensure ID is string
+                'image_url': p.image_url,
+                'metadata': p.metadata.dict()  # Convert Pydantic model to dict
+            } for p in batch]
             
-            # Upsert batch to Pinecone
-            if vectors:
-                search_engine.index.upsert(vectors=vectors)
-                total_processed += len(vectors)
-                logger.info(f"Processed and indexed batch of {len(vectors)} products. Total: {total_processed}")
-
-        # Get final index stats
-        stats = search_engine.index.describe_index_stats()
-        logger.info(f"Index built successfully. Total vectors: {stats.total_vector_count}")
+            # Process batch
+            try:
+                await search_engine.add_to_index(batch_data)
+                results.extend([p.id for p in batch])
+            except Exception as e:
+                logger.error(f"Error processing batch {i//batch_size}: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error processing batch {i//batch_size}: {str(e)}"
+                )
         
         return {
-            "status": "success", 
-            "message": f"Built index with {total_processed} products",
-            "index_stats": stats
+            "status": "success",
+            "processed_count": len(results),
+            "processed_ids": results
         }
-
-    except HTTPException:
-        raise
+        
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        logger.error(f"Index build failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 @router.get("/health")
 async def health_check(request: Request):

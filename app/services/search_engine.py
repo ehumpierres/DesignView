@@ -16,6 +16,7 @@ import os
 from pinecone import Pinecone
 from typing import List, Dict, Any
 from loguru import logger
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -264,3 +265,46 @@ class ProductSearchEngine:
         except Exception as e:
             logger.error(f"Error getting embedding for product {product.id}: {str(e)}")
             raise
+
+    async def add_to_index(self, products: List[Dict[str, Any]]):
+        try:
+            for product in products:
+                # Get image embedding
+                image_embedding = await self._get_image_embedding(product['image_url'])
+                
+                if image_embedding is not None:
+                    # Prepare vector data
+                    vector_data = {
+                        'id': product['id'],
+                        'values': image_embedding.tolist(),  # Convert numpy array to list
+                        'metadata': product['metadata']
+                    }
+                    
+                    # Upsert to Pinecone
+                    self.index.upsert(vectors=[vector_data])
+                    logger.info(f"Added product {product['id']} to index")
+                else:
+                    logger.warning(f"Skipping product {product['id']} - could not generate embedding")
+                    
+        except Exception as e:
+            logger.error(f"Error adding products to index: {str(e)}")
+            raise
+
+    async def _get_image_embedding(self, image_url: str):
+        try:
+            # Download and process image
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as response:
+                    if response.status != 200:
+                        raise ValueError(f"Failed to fetch image: {response.status}")
+                    
+                    image_data = await response.read()
+                    image = Image.open(io.BytesIO(image_data))
+                    
+                    # Generate embedding using your CLIP model
+                    embedding = self.model.encode_image(image)
+                    return embedding
+                    
+        except Exception as e:
+            logger.error(f"Error generating embedding for {image_url}: {str(e)}")
+            return None
