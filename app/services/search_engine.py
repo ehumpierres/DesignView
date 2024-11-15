@@ -17,6 +17,7 @@ from pinecone import Pinecone
 from typing import List, Dict, Any
 from loguru import logger
 import aiohttp
+from pydantic import HttpUrl, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -233,24 +234,28 @@ class ProductSearchEngine:
             # Format results
             search_results = []
             for match in results.matches:
-                # Reconstruct nested metadata structure for response
+                # Extract specifications from flattened metadata
                 metadata = match.metadata.copy()
                 specifications = {}
                 
-                # Extract specifications from flattened metadata
                 for key in list(metadata.keys()):
                     if key.startswith('spec_'):
                         spec_key = key.replace('spec_', '')
                         specifications[spec_key] = metadata.pop(key)
                 
-                # Add specifications back as nested dict
                 metadata['specifications'] = specifications
                 
+                # Create SearchResult with proper URL handling
+                try:
+                    image_url = HttpUrl(match.metadata.get('image_url', ''))
+                except ValidationError:
+                    image_url = None
+                    
                 search_results.append(SearchResult(
                     id=match.id,
                     score=float(match.score),
                     metadata=metadata,
-                    image_url=self.products.get(match.id, {}).get('image_url', '')
+                    image_url=image_url
                 ))
             
             return search_results

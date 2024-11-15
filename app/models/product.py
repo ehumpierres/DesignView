@@ -65,5 +65,8 @@ class SearchResult(BaseModel):
     """Search result model containing product info and similarity score"""
     id: str
     metadata: Dict[str, Any]
-    image_url: HttpUrl
+    image_url: Optional[HttpUrl] = None
     score: float = Field(ge=0.0, le=1.0)
+
+    class Config:
+        arbitrary_types_allowed = True
