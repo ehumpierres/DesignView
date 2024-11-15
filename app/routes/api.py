@@ -23,43 +23,24 @@ class ProductInput(BaseModel):
     image_url: HttpUrl
     metadata: ProductMetadata
 
-@router.post('/search')
-async def search_products(query: SearchQuery, request: Request):
-    """
-    Endpoint to search for similar products using image or text.
-    
-    Args:
-        query (SearchQuery): Contains either image_url or text_query
-        request (Request): FastAPI request object
-        
-    Returns:
-        List[SearchResult]: Ranked list of similar products
-        
-    Raises:
-        HTTPException: 500 if search operation fails
-    """
+@router.post("/search")
+async def search(query: SearchQuery):
     try:
-        # Get search_engine instance from app state
         search_engine = request.app.state.search_engine
         
-        # Ensure model and index are loaded
-        await search_engine.ensure_model_loaded()
+        # Validate the query
+        query.validate_query()
         
-        if not search_engine.index_loaded:
-            raise HTTPException(
-                status_code=400, 
-                detail="Search index not built. Please build index first."
-            )
-            
-        results = await search_engine.search(
-            query_image_url=query.image_url,
-            query_text=query.text,
-            num_results=query.num_results or 5
-        )
+        # Perform search
+        results = await search_engine.search(query)
         return results
+        
     except Exception as e:
-        logger.error(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 @router.post("/index/build")
 async def build_index(products: List[ProductInput], request: Request):

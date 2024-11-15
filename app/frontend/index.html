@@ -56,17 +56,17 @@
         <pre id="debugLog"></pre>
     </div>
     
-    <form id="searchForm" class="search-form">
+    <form id="searchForm" class="search-form" action="/api/search" method="POST" enctype="multipart/form-data">
         <div class="search-options">
-            <input type="text" id="textQuery" placeholder="Enter text search...">
+            <input type="text" id="textQuery" name="text" placeholder="Enter search text">
         </div>
         <div class="search-options">
             <label for="imageUpload">Or search by image:</label>
-            <input type="file" id="imageUpload" accept="image/*">
+            <input type="file" id="imageUpload" name="image_url">
         </div>
         <div class="search-options">
             <label for="numResults">Number of results:</label>
-            <input type="number" id="numResults" value="5" min="1" max="20">
+            <input type="number" id="numResults" name="num_results" value="5" min="1" max="20">
         </div>
         <button type="submit">Search</button>
     </form>
