@@ -93,6 +93,27 @@
             font-weight: bold;
             margin: 8px 0;
         }
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .image-input {
+            margin: 10px 0;
+        }
+
+        .search-controls {
+            margin-top: 20px;
+        }
+
+        /* Add loading indicator styles */
+        .loading {
+            display: none;
+            margin: 10px 0;
+        }
+
+        .loading.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -104,12 +125,31 @@
     </div>
     
     <form id="searchForm" method="POST" action="/api/search">
-        <input type="text" name="text" id="searchText" placeholder="Enter search text">
-        <p>Or search by image:</p>
-        <input type="file" name="image_url" id="searchImage">
-        <label for="numResults">Number of results:</label>
-        <input type="number" name="num_results" id="numResults" value="5">
-        <button type="submit">Search</button>
+        <div class="search-section">
+            <input type="text" name="text" id="searchText" placeholder="Enter search text">
+        </div>
+
+        <div class="search-section">
+            <p>Or search by image:</p>
+            
+            <!-- File upload option -->
+            <div class="image-input">
+                <label for="searchImage">Upload an image:</label>
+                <input type="file" name="image" id="searchImage" accept="image/*">
+            </div>
+
+            <!-- URL input option -->
+            <div class="image-input">
+                <label for="imageUrl">Or paste image URL:</label>
+                <input type="text" name="image_url" id="imageUrl" placeholder="https://example.com/image.jpg">
+            </div>
+        </div>
+
+        <div class="search-controls">
+            <label for="numResults">Number of results:</label>
+            <input type="number" name="num_results" id="numResults" value="5" min="1" max="20">
+            <button type="submit">Search</button>
+        </div>
     </form>
 
     <div id="errorMessage" style="color: red; display: none;"></div>
@@ -153,37 +193,41 @@
         document.getElementById('searchForm').onsubmit = async function(e) {
             e.preventDefault();
             
-            if (!resultsDiv || !errorDiv) {
-                console.error('Required DOM elements not found');
-                return;
-            }
-            
             const formData = new FormData();
-            
-            // Properly add form fields
             const textInput = document.getElementById('searchText').value;
+            const imageFile = document.getElementById('searchImage').files[0];
+            const imageUrl = document.getElementById('imageUrl').value;
             const numResults = document.getElementById('numResults').value;
             
-            formData.append('text', textInput || '');
-            formData.append('num_results', numResults || '5');
-            
-            // Debug what we're sending
-            console.log('Sending form data:', {
-                text: formData.get('text'),
-                num_results: formData.get('num_results')
-            });
+            // Clear previous errors
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
             
             try {
+                // Check if we have at least one search input
+                if (!textInput && !imageFile && !imageUrl) {
+                    throw new Error('Please provide either text or an image to search');
+                }
+                
+                // Handle file upload if present
+                if (imageFile) {
+                    const uploadedUrl = await uploadImageToS3(imageFile);
+                    formData.append('image_url', uploadedUrl);
+                } else if (imageUrl) {
+                    formData.append('image_url', imageUrl);
+                }
+                
+                // Add other form data
+                formData.append('text', textInput || '');
+                formData.append('num_results', numResults || '5');
+                
+                // Show loading state
+                resultsDiv.innerHTML = '<div class="loading active">Searching...</div>';
+                
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
                     body: formData
                 });
-                
-                // Log the raw response
-                console.log('Raw response:', response);
-                
-                // Log response headers
-                console.log('Response headers:', Object.fromEntries([...response.headers]));
                 
                 // Get response text first for debugging
                 const responseText = await response.text();
@@ -230,22 +274,11 @@
                         </div>
                     `).join('') : 'Invalid response format';
                 
-                errorDiv.style.display = 'none';
-                errorDiv.textContent = '';
-                
             } catch (error) {
                 console.error('Search error:', error);
-                const errorDiv = document.getElementById('errorMessage');
-                const resultsDiv = document.getElementById('searchResults');
-                
-                if (errorDiv) {
-                    errorDiv.style.display = 'block';
-                    errorDiv.textContent = `Error: ${error.message}`;
-                }
-                
-                if (resultsDiv) {
-                    resultsDiv.innerHTML = '';
-                }
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = `Error: ${error.message}`;
+                resultsDiv.innerHTML = '';
             }
         };
         
@@ -290,18 +323,21 @@
         document.getElementById('searchText').addEventListener('input', (e) => {
             if (e.target.value) {
                 document.getElementById('searchImage').value = '';
+                document.getElementById('imageUrl').value = '';
             }
         });
 
-        document.getElementById('searchImage').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                    alert('Please select an image smaller than 5MB');
-                    e.target.value = '';
-                    return;
-                }
+        document.getElementById('searchImage').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
                 document.getElementById('searchText').value = '';
+                document.getElementById('imageUrl').value = '';
+            }
+        });
+
+        document.getElementById('imageUrl').addEventListener('input', (e) => {
+            if (e.target.value) {
+                document.getElementById('searchText').value = '';
+                document.getElementById('searchImage').value = '';
             }
         });
 
