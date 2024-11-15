@@ -211,8 +211,12 @@
                         <div class="search-result">
                             <div class="result-image">
                                 ${result.metadata?.image_url ? 
-                                    `<img src="${result.metadata.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` 
-                                    : 'No image available'}
+                                    `<img src="${result.metadata.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` :
+                                 result.metadata?.imageUrl ? 
+                                    `<img src="${result.metadata.imageUrl}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` :
+                                 result.image_url ? 
+                                    `<img src="${result.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` :
+                                    'No image available'}
                             </div>
                             <div class="result-info">
                                 <h3>${result.metadata?.name || 'Unnamed Product'}</h3>
