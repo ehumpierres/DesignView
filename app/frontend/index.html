@@ -117,50 +117,70 @@
             e.preventDefault();
             
             const formData = new FormData(this);
-            debugLog.log(`Submitting search with text: ${formData.get('text')}, image: ${formData.get('image_url')}`);
             const errorDiv = document.getElementById('errorMessage');
             const resultsDiv = document.getElementById('searchResults');
             
+            // Debug logging
+            console.log('Form submission started');
+            console.log('Form data:', {
+                text: formData.get('text'),
+                image_url: formData.get('image_url'),
+                num_results: formData.get('num_results')
+            });
+            
             try {
-                // If there's an image file, upload it first
-                const imageFile = document.getElementById('searchImage').files[0];
-                if (imageFile) {
-                    const imageUrl = await uploadImageToS3(imageFile);
-                    formData.set('image_url', imageUrl);
-                }
+                // Log the request
+                console.log('Sending request to:', `${API_URL}/api/search`);
                 
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
                     body: formData
                 });
                 
-                const responseData = await response.json();
+                // Log the raw response
+                console.log('Raw response:', response);
+                
+                // Log response headers
+                console.log('Response headers:', Object.fromEntries([...response.headers]));
+                
+                // Get response text first for debugging
+                const responseText = await response.text();
+                console.log('Response text:', responseText);
+                
+                // Try to parse JSON
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                    console.log('Parsed response data:', responseData);
+                } catch (parseError) {
+                    console.error('JSON parse error:', parseError);
+                    throw new Error(`Failed to parse response: ${responseText}`);
+                }
                 
                 if (!response.ok) {
-                    // Better error handling
-                    const errorMessage = responseData.detail || responseData.message || 'Search failed';
+                    const errorMessage = typeof responseData === 'object' ? 
+                        JSON.stringify(responseData) : responseData;
                     throw new Error(errorMessage);
                 }
                 
                 // Display results
-                resultsDiv.innerHTML = responseData.map(result => `
-                    <div class="search-result">
-                        <h3>${result.metadata.name || 'Unnamed Product'}</h3>
-                        <p>Score: ${(result.score * 100).toFixed(2)}%</p>
-                        <p>${result.metadata.description || 'No description available'}</p>
-                        ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata.name || 'Product image'}" style="max-width: 200px;">` : ''}
-                    </div>
-                `).join('');
+                resultsDiv.innerHTML = Array.isArray(responseData) ? 
+                    responseData.map(result => `
+                        <div class="search-result">
+                            <h3>${result.metadata?.name || 'Unnamed Product'}</h3>
+                            <p>Score: ${(result.score * 100).toFixed(2)}%</p>
+                            <p>${result.metadata?.description || 'No description available'}</p>
+                            ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` : ''}
+                        </div>
+                    `).join('') : 'Invalid response format';
                 
-                // Clear any previous errors
                 errorDiv.style.display = 'none';
                 errorDiv.textContent = '';
                 
             } catch (error) {
-                // Improved error display
+                console.error('Search error:', error);
                 errorDiv.style.display = 'block';
-                errorDiv.textContent = `Error: ${error.message || 'An unknown error occurred'}`;
-                debugLog.error('Search error:', error);
+                errorDiv.textContent = `Error: ${error.message}`;
                 resultsDiv.innerHTML = '';
             }
         };
@@ -220,6 +240,32 @@
                 document.getElementById('searchText').value = '';
             }
         });
+
+        // Add visible debug panel
+        const debugPanel = document.createElement('div');
+        debugPanel.innerHTML = `
+            <div id="debugPanel" style="position: fixed; bottom: 0; right: 0; background: #f0f0f0; padding: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ccc;">
+                <h4>Debug Log</h4>
+                <pre id="debugOutput"></pre>
+            </div>
+        `;
+        document.body.appendChild(debugPanel);
+
+        // Override console.log and console.error
+        const originalLog = console.log;
+        const originalError = console.error;
+        console.log = function() {
+            const debugOutput = document.getElementById('debugOutput');
+            debugOutput.textContent += '\n[LOG] ' + Array.from(arguments).join(' ');
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+            originalLog.apply(console, arguments);
+        };
+        console.error = function() {
+            const debugOutput = document.getElementById('debugOutput');
+            debugOutput.textContent += '\n[ERROR] ' + Array.from(arguments).join(' ');
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+            originalError.apply(console, arguments);
+        };
     </script>
 </body>
 </html> 

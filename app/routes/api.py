@@ -30,33 +30,44 @@ async def search(
     image_url: Optional[str] = Form(None),
     num_results: int = Form(5)
 ):
+    logger.info(f"Search request received - text: {text}, image_url: {image_url}, num_results: {num_results}")
+    
     try:
         search_engine = request.app.state.search_engine
+        logger.info("Search engine instance retrieved")
         
         if not search_engine:
+            logger.error("Search engine not initialized")
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
         if not text and not image_url:
+            logger.error("No search criteria provided")
             raise HTTPException(status_code=400, detail="Either text or image_url must be provided")
-            
-        # Create SearchQuery object
+        
+        # Log query creation
+        logger.info("Creating SearchQuery object")
         query = SearchQuery(
             text=text,
             image_url=image_url if image_url else None,
             num_results=num_results
         )
+        logger.info(f"SearchQuery created: {query}")
         
-        # Log the query for debugging
-        logger.info(f"Processing search query: text='{text}', image_url='{image_url}', num_results={num_results}")
-        
+        # Log search execution
+        logger.info("Executing search")
         results = await search_engine.search(query)
+        logger.info(f"Search completed, found {len(results)} results")
+        
+        # Log results summary
+        logger.info(f"Results summary: {[{'id': r.id, 'score': r.score} for r in results]}")
+        
         return results
         
     except Exception as e:
-        logger.error(f"Search failed: {str(e)}")
+        logger.exception(f"Search failed with error: {str(e)}")
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=f"Search failed: {str(e)}"
         )
 
 @router.post("/index/build")
