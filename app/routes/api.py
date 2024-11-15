@@ -30,36 +30,41 @@ async def search(
     image_url: Optional[str] = Form(default=None),
     num_results: int = Form(default=5)
 ):
-    logger.info(f"Search request received with params: text='{text}', image_url='{image_url}', num_results={num_results}")
+    logger.info(f"Search request received with raw params: text='{text}', image_url='{image_url}', num_results={num_results}")
     
     try:
         search_engine = request.app.state.search_engine
         if not search_engine:
+            logger.error("Search engine not initialized")
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Validate inputs
-        if not text and not image_url:
-            raise HTTPException(status_code=400, detail="Either text or image_url must be provided")
+        # Create and validate query
+        try:
+            query = SearchQuery(
+                text=text,
+                image_url=image_url,
+                num_results=num_results
+            )
+            # Explicit validation call
+            query.validate_query()
+            logger.info(f"Query validated successfully: {query.dict()}")
+            
+        except ValueError as ve:
+            logger.error(f"Query validation failed: {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))
         
-        # Create query with explicit type conversion
-        query = SearchQuery(
-            text=str(text) if text else None,
-            image_url=str(image_url) if image_url else None,
-            num_results=int(num_results)
-        )
-        
-        logger.info(f"Created query object: {query}")
+        # Execute search
         results = await search_engine.search(query)
+        logger.info(f"Search completed with {len(results)} results")
         
-        # Convert results to dict for safe serialization
         return [result.dict() for result in results]
         
-    except ValueError as ve:
-        logger.error(f"Validation error: {str(ve)}")
-        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.exception("Search failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Search failed: {str(e)}"
+        )
 
 @router.post("/index/build")
 async def build_index(products: List[ProductInput], request: Request):
