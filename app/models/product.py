@@ -30,36 +30,19 @@ class Product(BaseModel):
 
 class SearchQuery(BaseModel):
     """Search query model supporting either image URL or text search"""
-    image_url: Optional[HttpUrl] = Field(
-        default=None, 
-        description="URL of the query image"
-    )
-    text: Optional[str] = Field(
-        default=None, 
-        description="Text query for semantic search"
-    )
-    num_results: Optional[int] = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Number of results to return (1-20)"
-    )
+    text: Optional[str] = None
+    image_url: Optional[str] = None
+    num_results: int = Field(default=5, ge=1, le=100)
 
-    class Config:
-        schema_extra = {
-            "example": {
-                "text": "modern black table lamp",
-                "num_results": 5
-            }
-        }
+    @validator('text', 'image_url')
+    def validate_query_inputs(cls, v):
+        if v is not None:
+            return str(v)
+        return v
 
     def validate_query(self):
-        """Ensure either image_url or text is provided, but not both"""
-        if self.image_url is None and self.text is None:
-            raise ValueError("Either image_url or text must be provided")
-        if self.image_url is not None and self.text is not None:
-            raise ValueError("Only one of image_url or text should be provided")
-        return True
+        if not self.text and not self.image_url:
+            raise ValueError("Either text or image_url must be provided")
 
 class SearchResult(BaseModel):
     """Search result model containing product info and similarity score"""

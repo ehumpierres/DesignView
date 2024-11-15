@@ -26,49 +26,40 @@ class ProductInput(BaseModel):
 @router.post("/search")
 async def search(
     request: Request,
-    text: Optional[str] = Form(None),
-    image_url: Optional[str] = Form(None),
-    num_results: int = Form(5)
+    text: Optional[str] = Form(default=''),
+    image_url: Optional[str] = Form(default=None),
+    num_results: int = Form(default=5)
 ):
-    logger.info(f"Search request received - text: {text}, image_url: {image_url}, num_results: {num_results}")
+    logger.info(f"Search request received with params: text='{text}', image_url='{image_url}', num_results={num_results}")
     
     try:
         search_engine = request.app.state.search_engine
-        logger.info("Search engine instance retrieved")
-        
         if not search_engine:
-            logger.error("Search engine not initialized")
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
+        # Validate inputs
         if not text and not image_url:
-            logger.error("No search criteria provided")
             raise HTTPException(status_code=400, detail="Either text or image_url must be provided")
         
-        # Log query creation
-        logger.info("Creating SearchQuery object")
+        # Create query with explicit type conversion
         query = SearchQuery(
-            text=text,
-            image_url=image_url if image_url else None,
-            num_results=num_results
+            text=str(text) if text else None,
+            image_url=str(image_url) if image_url else None,
+            num_results=int(num_results)
         )
-        logger.info(f"SearchQuery created: {query}")
         
-        # Log search execution
-        logger.info("Executing search")
+        logger.info(f"Created query object: {query}")
         results = await search_engine.search(query)
-        logger.info(f"Search completed, found {len(results)} results")
         
-        # Log results summary
-        logger.info(f"Results summary: {[{'id': r.id, 'score': r.score} for r in results]}")
+        # Convert results to dict for safe serialization
+        return [result.dict() for result in results]
         
-        return results
-        
+    except ValueError as ve:
+        logger.error(f"Validation error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        logger.exception(f"Search failed with error: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Search failed: {str(e)}"
-        )
+        logger.exception("Search failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/index/build")
 async def build_index(products: List[ProductInput], request: Request):
