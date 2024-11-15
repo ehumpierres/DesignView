@@ -48,40 +48,39 @@ class ProductSearchEngine:
         Sets up device configuration, model placeholders, and S3 paths.
         """
         if not self.initialized:
-            self.device = "cpu"  # Force CPU to save memory
-            torch.set_num_threads(1)  # Limit threads
-            self.model = None
-            self.preprocess = None
-            self.model_loaded = False
-            self.index_loaded = False
-            self.feature_dim = 512
-            self.embeddings_file = "embeddings/product_embeddings.pkl"
-            logger.info("ProductSearchEngine initialized")
-            self.initialized = True
-            self.products = {}
-            
-            # Initialize Pinecone with new syntax
-            pc = Pinecone(
-                api_key=os.getenv("PINECONE_API_KEY")
-            )
-            
-            index_name = os.getenv("PINECONE_INDEX_NAME")
-            
-            # List indexes using new syntax
-            existing_indexes = pc.list_indexes().names()
-            if index_name not in existing_indexes:
-                # Create index using new syntax
-                pc.create_index(
-                    name=index_name,
-                    dimension=512,  # CLIP embedding dimension
-                    metric="cosine"
+            try:
+                self.device = "cpu"  # Force CPU to save memory
+                torch.set_num_threads(1)  # Limit threads
+                self.model = None
+                self.preprocess = None
+                self.model_loaded = False
+                self.index_loaded = False
+                self.feature_dim = 512
+                self.embeddings_file = "embeddings/product_embeddings.pkl"
+                logger.info("ProductSearchEngine initialized")
+                self.initialized = True
+                self.products = {}
+                
+                # Initialize Pinecone with proper scheme
+                pc = Pinecone(
+                    api_key=os.getenv('PINECONE_API_KEY'),
+                    environment=os.getenv('PINECONE_ENVIRONMENT')
                 )
-                logger.info(f"Created new Pinecone index: {index_name}")
-            
-            # Get index using new syntax
-            self.index = pc.Index(index_name)
-            self.index_loaded = True
-            logger.info("Pinecone index loaded successfully")
+                
+                # Get the index with the proper name
+                self.index = pc.Index(os.getenv('PINECONE_INDEX_NAME'))
+                
+                # Initialize CLIP model
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+                self.model_loaded = True
+                
+                logger.info("Search engine initialized successfully")
+                
+            except Exception as e:
+                logger.error(f"Failed to initialize search engine: {str(e)}")
+                self.model_loaded = False
+                raise
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
@@ -210,59 +209,26 @@ class ProductSearchEngine:
             # Ensure model is loaded
             await self.ensure_model_loaded()
             
-            # Get query embedding
-            if query.image_url:
-                # Process image query
-                query_embedding = await self._get_image_embedding(query.image_url)
-            elif query.text:
-                # Process text query using CLIP's text encoder
-                with torch.no_grad():
-                    text = clip.tokenize([query.text]).to(self.device)
-                    query_embedding = self.model.encode_text(text)
-                    query_embedding = query_embedding.cpu().numpy()
-                    query_embedding = query_embedding / np.linalg.norm(query_embedding)
+            # Get embedding based on query type
+            if query.text:
+                embedding = await self._get_text_embedding(query.text)
+            elif query.image_url:
+                embedding = await self._get_image_embedding(query.image_url)
             else:
-                raise ValueError("Either image_url or text query must be provided")
+                raise ValueError("Either text or image_url must be provided")
 
-            # Query Pinecone
+            # Perform vector search
             results = self.index.query(
-                vector=query_embedding.tolist(),
+                vector=embedding.tolist(),
                 top_k=query.num_results,
                 include_metadata=True
             )
             
-            # Format results
+            logger.info(f"Search completed with {len(results.matches)} results")
+            
             search_results = []
             for match in results.matches:
-                # Extract specifications from flattened metadata
-                metadata = match.metadata.copy()
-                specifications = {}
-                
-                for key in list(metadata.keys()):
-                    if key.startswith('spec_'):
-                        spec_key = key.replace('spec_', '')
-                        specifications[spec_key] = metadata.pop(key)
-                
-                metadata['specifications'] = specifications
-                
-                # Create SearchResult with proper URL handling
-                try:
-                    image_url = HttpUrl(match.metadata.get('image_url', ''))
-                except ValidationError:
-                    image_url = None
-                    
-                search_results.append(SearchResult(
-                    id=match.id,
-                    score=float(match.score),
-                    metadata=metadata,
-                    image_url=image_url
-                ))
-            
-            return search_results
-            
-        except Exception as e:
-            logger.error(f"Search error: {str(e)}")
-            raise
+                # Process results...
 
     async def cleanup(self):
         """Optional: Delete the index when needed"""

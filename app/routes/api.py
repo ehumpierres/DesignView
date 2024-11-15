@@ -114,44 +114,18 @@ async def build_index(products: List[ProductInput], request: Request):
 async def health_check(request: Request):
     try:
         search_engine = request.app.state.search_engine
-        
         if not search_engine:
-            return {
-                "status": "unhealthy",
-                "error": "Search engine not initialized"
-            }
+            return {"status": "unhealthy", "error": "Search engine not initialized"}
+            
+        # Test Pinecone connection
+        index_stats = search_engine.index.describe_index_stats()
         
-        # Simplify the response structure
-        index_stats: Dict[str, Any] = {}
-        try:
-            if search_engine.index:
-                # Get basic stats without nested objects
-                stats = search_engine.index.describe_index_stats()
-                index_stats = {
-                    "dimension": stats.get("dimension", 0),
-                    "total_vector_count": stats.get("total_vector_count", 0),
-                    "namespaces": list(stats.get("namespaces", {}).keys())
-                }
-        except Exception as e:
-            logger.error(f"Error getting index stats: {str(e)}")
-            index_stats = {"error": str(e)}
-
-        response = {
+        return {
             "status": "healthy",
-            "model_loaded": bool(search_engine.model_loaded),
+            "model_loaded": search_engine.model_loaded,
+            "pinecone_connected": True,
             "index_stats": index_stats
         }
-        
-        # Use FastAPI's encoder with custom settings
-        return jsonable_encoder(
-            response,
-            custom_encoder={
-                datetime: str,
-                bytes: lambda v: v.decode(),
-            },
-            exclude_none=True
-        )
-        
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {
