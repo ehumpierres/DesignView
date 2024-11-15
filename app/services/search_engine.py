@@ -18,6 +18,7 @@ from typing import List, Dict, Any
 from loguru import logger
 import aiohttp
 from pydantic import HttpUrl, ValidationError
+import pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -228,14 +229,26 @@ class ProductSearchEngine:
             
             search_results = []
             for match in results.matches:
-                # Process results...
+                search_results.append(SearchResult(
+                    id=match.id,
+                    score=float(match.score),
+                    metadata=match.metadata
+                ))
+            return search_results
+            
+        except Exception as e:
+            logger.error(f"Error during search: {str(e)}")
+            raise
 
     async def cleanup(self):
         """Optional: Delete the index when needed"""
         try:
-            pinecone.delete_index(self.index_name)
+            if hasattr(self, 'index'):
+                self.index.delete(delete_all=True)
+            logger.info("Index cleanup completed successfully")
         except Exception as e:
             logger.error(f"Error cleaning up index: {str(e)}")
+            raise
 
     async def get_embedding_from_metadata(self, product: Product) -> np.ndarray:
         """
@@ -291,4 +304,19 @@ class ProductSearchEngine:
                     
         except Exception as e:
             logger.error(f"Error adding products to index: {str(e)}")
+            raise
+
+    async def shutdown(self):
+        """Graceful shutdown of the search engine"""
+        try:
+            if self.model_loaded:
+                del self.model
+                del self.preprocess
+                self.model_loaded = False
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            gc.collect()
+            logger.info("Search engine shut down successfully")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {str(e)}")
             raise
