@@ -134,20 +134,21 @@
                     body: formData
                 });
                 
+                const responseData = await response.json();
+                
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Search failed');
+                    // Better error handling
+                    const errorMessage = responseData.detail || responseData.message || 'Search failed';
+                    throw new Error(errorMessage);
                 }
                 
-                const results = await response.json();
-                
                 // Display results
-                resultsDiv.innerHTML = results.map(result => `
+                resultsDiv.innerHTML = responseData.map(result => `
                     <div class="search-result">
-                        <h3>${result.metadata.name}</h3>
+                        <h3>${result.metadata.name || 'Unnamed Product'}</h3>
                         <p>Score: ${(result.score * 100).toFixed(2)}%</p>
-                        <p>${result.metadata.description}</p>
-                        ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata.name}" style="max-width: 200px;">` : ''}
+                        <p>${result.metadata.description || 'No description available'}</p>
+                        ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata.name || 'Product image'}" style="max-width: 200px;">` : ''}
                     </div>
                 `).join('');
                 
@@ -156,9 +157,10 @@
                 errorDiv.textContent = '';
                 
             } catch (error) {
-                // Display error message
+                // Improved error display
                 errorDiv.style.display = 'block';
-                errorDiv.textContent = `Error: ${error.message}`;
+                errorDiv.textContent = `Error: ${error.message || 'An unknown error occurred'}`;
+                debugLog.error('Search error:', error);
                 resultsDiv.innerHTML = '';
             }
         };
