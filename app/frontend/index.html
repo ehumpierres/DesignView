@@ -46,6 +46,19 @@
             background: #fff0f0;
             border-radius: 4px;
         }
+        .search-result {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #errorMessage {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #ffebee;
+            border: 1px solid #ffcdd2;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -56,15 +69,17 @@
         <pre id="debugLog"></pre>
     </div>
     
-    <form id="searchForm" action="/api/search" method="POST">
+    <form id="searchForm" method="POST" action="/api/search">
         <input type="text" name="text" id="searchText" placeholder="Enter search text">
         <p>Or search by image:</p>
         <input type="file" name="image_url" id="searchImage">
-        <input type="number" name="num_results" value="5" id="numResults">
+        <label for="numResults">Number of results:</label>
+        <input type="number" name="num_results" id="numResults" value="5">
         <button type="submit">Search</button>
     </form>
 
-    <div id="results"></div>
+    <div id="errorMessage" style="color: red; display: none;"></div>
+    <div id="searchResults"></div>
 
     <script>
         const debugLog = {
@@ -101,25 +116,50 @@
         document.getElementById('searchForm').onsubmit = async function(e) {
             e.preventDefault();
             
-            const formData = {
-                text: document.getElementById('searchText').value,
-                num_results: parseInt(document.getElementById('numResults').value)
-            };
+            const formData = new FormData(this);
+            debugLog.log(`Submitting search with text: ${formData.get('text')}, image: ${formData.get('image_url')}`);
+            const errorDiv = document.getElementById('errorMessage');
+            const resultsDiv = document.getElementById('searchResults');
             
             try {
-                const response = await fetch('/api/search', {
+                // If there's an image file, upload it first
+                const imageFile = document.getElementById('searchImage').files[0];
+                if (imageFile) {
+                    const imageUrl = await uploadImageToS3(imageFile);
+                    formData.set('image_url', imageUrl);
+                }
+                
+                const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
+                    body: formData
                 });
                 
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Search failed');
+                }
+                
                 const results = await response.json();
-                // Handle results...
+                
+                // Display results
+                resultsDiv.innerHTML = results.map(result => `
+                    <div class="search-result">
+                        <h3>${result.metadata.name}</h3>
+                        <p>Score: ${(result.score * 100).toFixed(2)}%</p>
+                        <p>${result.metadata.description}</p>
+                        ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata.name}" style="max-width: 200px;">` : ''}
+                    </div>
+                `).join('');
+                
+                // Clear any previous errors
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
                 
             } catch (error) {
-                console.error('Search failed:', error);
+                // Display error message
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = `Error: ${error.message}`;
+                resultsDiv.innerHTML = '';
             }
         };
         

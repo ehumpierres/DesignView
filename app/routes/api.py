@@ -1,10 +1,10 @@
-from fastapi import APIRouter, UploadFile, HTTPException, Request, File
+from fastapi import APIRouter, UploadFile, HTTPException, Request, File, Form
 from app.services.search_engine import ProductSearchEngine
 from app.models.product import SearchQuery, Product, ProductMetadata
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.services.s3_handler import S3Handler
 import logging
 import requests
@@ -24,24 +24,38 @@ class ProductInput(BaseModel):
     metadata: ProductMetadata
 
 @router.post("/search")
-async def search(query: SearchQuery, request: Request):
+async def search(
+    request: Request,
+    text: Optional[str] = Form(None),
+    image_url: Optional[str] = Form(None),
+    num_results: int = Form(5)
+):
     try:
         search_engine = request.app.state.search_engine
         
         if not search_engine:
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Validate the query
-        query.validate_query()
+        if not text and not image_url:
+            raise HTTPException(status_code=400, detail="Either text or image_url must be provided")
+            
+        # Create SearchQuery object
+        query = SearchQuery(
+            text=text,
+            image_url=image_url if image_url else None,
+            num_results=num_results
+        )
         
-        # Perform search
+        # Log the query for debugging
+        logger.info(f"Processing search query: text='{text}', image_url='{image_url}', num_results={num_results}")
+        
         results = await search_engine.search(query)
         return results
         
     except Exception as e:
         logger.error(f"Search failed: {str(e)}")
         raise HTTPException(
-            status_code=500,
+            status_code=400,
             detail=str(e)
         )
 
