@@ -59,6 +59,40 @@
             border: 1px solid #ffcdd2;
             border-radius: 4px;
         }
+        .search-result {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .result-image {
+            flex: 0 0 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-image img {
+            max-width: 200px;
+            max-height: 200px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .result-info {
+            flex: 1;
+        }
+
+        .similarity-score {
+            color: #2196F3;
+            font-weight: bold;
+            margin: 8px 0;
+        }
     </style>
 </head>
 <body>
@@ -175,10 +209,17 @@
                 resultsDiv.innerHTML = Array.isArray(responseData) ? 
                     responseData.map(result => `
                         <div class="search-result">
-                            <h3>${result.metadata?.name || 'Unnamed Product'}</h3>
-                            <p>Score: ${(result.score * 100).toFixed(2)}%</p>
-                            <p>${result.metadata?.description || 'No description available'}</p>
-                            ${result.image_url ? `<img src="${result.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` : ''}
+                            <div class="result-image">
+                                ${result.metadata?.image_url ? 
+                                    `<img src="${result.metadata.image_url}" alt="${result.metadata?.name || 'Product image'}" style="max-width: 200px;">` 
+                                    : 'No image available'}
+                            </div>
+                            <div class="result-info">
+                                <h3>${result.metadata?.name || 'Unnamed Product'}</h3>
+                                <p class="similarity-score">Similarity Score: ${(result.score * 100).toFixed(2)}%</p>
+                                <p>${result.metadata?.description || 'No description available'}</p>
+                                <p>Category: ${result.metadata?.category || 'Uncategorized'}</p>
+                            </div>
                         </div>
                     `).join('') : 'Invalid response format';
                 
