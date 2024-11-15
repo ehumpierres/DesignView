@@ -113,8 +113,16 @@
         const API_URL = 'https://designview-staging-65571a6c93bd.herokuapp.com';
         debugLog.log(`API URL set to: ${API_URL}`);
         
+        const resultsDiv = document.getElementById('searchResults');
+        const errorDiv = document.getElementById('errorMessage');
+        
         document.getElementById('searchForm').onsubmit = async function(e) {
             e.preventDefault();
+            
+            if (!resultsDiv || !errorDiv) {
+                console.error('Required DOM elements not found');
+                return;
+            }
             
             const formData = new FormData();
             
@@ -179,9 +187,17 @@
                 
             } catch (error) {
                 console.error('Search error:', error);
-                errorDiv.style.display = 'block';
-                errorDiv.textContent = `Error: ${error.message}`;
-                resultsDiv.innerHTML = '';
+                const errorDiv = document.getElementById('errorMessage');
+                const resultsDiv = document.getElementById('searchResults');
+                
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = `Error: ${error.message}`;
+                }
+                
+                if (resultsDiv) {
+                    resultsDiv.innerHTML = '';
+                }
             }
         };
         
