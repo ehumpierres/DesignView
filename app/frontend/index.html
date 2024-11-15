@@ -56,18 +56,11 @@
         <pre id="debugLog"></pre>
     </div>
     
-    <form id="searchForm" class="search-form" action="/api/search" method="POST" enctype="multipart/form-data">
-        <div class="search-options">
-            <input type="text" id="textQuery" name="text" placeholder="Enter search text">
-        </div>
-        <div class="search-options">
-            <label for="imageUpload">Or search by image:</label>
-            <input type="file" id="imageUpload" name="image_url">
-        </div>
-        <div class="search-options">
-            <label for="numResults">Number of results:</label>
-            <input type="number" id="numResults" name="num_results" value="5" min="1" max="20">
-        </div>
+    <form id="searchForm" action="/api/search" method="POST">
+        <input type="text" name="text" id="searchText" placeholder="Enter search text">
+        <p>Or search by image:</p>
+        <input type="file" name="image_url" id="searchImage">
+        <input type="number" name="num_results" value="5" id="numResults">
         <button type="submit">Search</button>
     </form>
 
@@ -105,94 +98,28 @@
         const API_URL = 'https://designview-staging-65571a6c93bd.herokuapp.com';
         debugLog.log(`API URL set to: ${API_URL}`);
         
-        document.getElementById('searchForm').onsubmit = async (e) => {
+        document.getElementById('searchForm').onsubmit = async function(e) {
             e.preventDefault();
-            debugLog.log('Form submitted');
             
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+            const formData = {
+                text: document.getElementById('searchText').value,
+                num_results: parseInt(document.getElementById('numResults').value)
+            };
             
             try {
-                const textQuery = document.getElementById('textQuery').value;
-                const imageFile = document.getElementById('imageUpload').files[0];
-                const numResults = parseInt(document.getElementById('numResults').value);
-                
-                debugLog.log(`Search parameters - Text: ${textQuery}, Image: ${imageFile?.name}, Results: ${numResults}`);
-                
-                if (!textQuery && !imageFile) {
-                    throw new Error('Please provide either text query or image');
-                }
-                
-                let searchBody = { 
-                    num_results: numResults,
-                    text: textQuery || null,
-                    image_url: null
-                };
-                
-                if (imageFile) {
-                    try {
-                        debugLog.log('Starting image upload...');
-                        resultsDiv.innerHTML = '<div class="loading">Uploading image...</div>';
-                        const imageUrl = await uploadImageToS3(imageFile);
-                        debugLog.log(`Image uploaded successfully: ${imageUrl}`);
-                        searchBody.image_url = imageUrl;
-                        searchBody.text = null;
-                    } catch (uploadError) {
-                        debugLog.error('Image upload failed', uploadError);
-                        throw new Error(`Image upload failed: ${uploadError.message}`);
-                    }
-                }
-                
-                debugLog.log('Initiating search request...');
-                resultsDiv.innerHTML = '<div class="loading">Processing search...</div>';
-                
-                debugLog.log(`Sending search request to ${API_URL}/api/search`);
-                debugLog.log(`Request body: ${JSON.stringify(searchBody)}`);
-                
-                const response = await fetch(`${API_URL}/api/search`, {
+                const response = await fetch('/api/search', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(searchBody)
+                    body: JSON.stringify(formData)
                 });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    debugLog.error('Search API error', new Error(JSON.stringify(errorData)));
-                    throw new Error(errorData.detail || `Search failed: ${response.status} ${response.statusText}`);
-                }
-
+                
                 const results = await response.json();
-                debugLog.log(`Search completed. Found ${results.length} results`);
-                resultsDiv.innerHTML = '';
-
-                if (results.length === 0) {
-                    resultsDiv.innerHTML = '<div>No results found</div>';
-                    return;
-                }
-
-                results.forEach(result => {
-                    const card = document.createElement('div');
-                    card.className = 'result-card';
-                    
-                    const name = result.metadata.name || 'Unnamed Product';
-                    const description = result.metadata.description || '';
-                    const category = result.metadata.category || '';
-                    
-                    card.innerHTML = `
-                        <img class="result-image" src="${result.image_url}" alt="${name}"
-                             onerror="this.src='placeholder-image.jpg'">
-                        <h3>${name}</h3>
-                        ${description ? `<p>${description}</p>` : ''}
-                        ${category ? `<p>Category: ${category}</p>` : ''}
-                        <p class="similarity-score">Similarity: ${(result.score * 100).toFixed(1)}%</p>
-                    `;
-                    resultsDiv.appendChild(card);
-                });
+                // Handle results...
+                
             } catch (error) {
-                debugLog.error('Search operation failed', error);
-                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Search failed:', error);
             }
         };
         
@@ -234,13 +161,13 @@
 
         debugLog.log('Page loaded successfully');
         
-        document.getElementById('textQuery').addEventListener('input', (e) => {
+        document.getElementById('searchText').addEventListener('input', (e) => {
             if (e.target.value) {
-                document.getElementById('imageUpload').value = '';
+                document.getElementById('searchImage').value = '';
             }
         });
 
-        document.getElementById('imageUpload').addEventListener('change', async (e) => {
+        document.getElementById('searchImage').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
                 if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -248,7 +175,7 @@
                     e.target.value = '';
                     return;
                 }
-                document.getElementById('textQuery').value = '';
+                document.getElementById('searchText').value = '';
             }
         });
     </script>

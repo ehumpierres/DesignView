@@ -24,9 +24,12 @@ class ProductInput(BaseModel):
     metadata: ProductMetadata
 
 @router.post("/search")
-async def search(query: SearchQuery):
+async def search(query: SearchQuery, request: Request):
     try:
         search_engine = request.app.state.search_engine
+        
+        if not search_engine:
+            raise HTTPException(status_code=500, detail="Search engine not initialized")
         
         # Validate the query
         query.validate_query()
