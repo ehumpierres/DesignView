@@ -226,7 +226,10 @@ class ProductSearchEngine:
                 SearchResult(
                     id=str(match.id),
                     score=float(match.score),
-                    metadata=safe_json_encode(match.metadata)
+                    metadata={
+                        **match.metadata,
+                        'image_url': match.metadata.get('image_url')
+                    }
                 )
                 for match in results.matches
             ]
@@ -284,18 +287,21 @@ class ProductSearchEngine:
                 
                 if image_embedding is not None:
                     # Ensure embedding is properly formatted
-                    vector_values = image_embedding.squeeze().tolist()  # Convert to 1D list
+                    vector_values = image_embedding.squeeze().tolist()
                     
-                    # Prepare vector data
-                    vector_data = [{  # Wrap in list for upsert
+                    # Prepare vector data with image_url in metadata
+                    vector_data = [{
                         'id': product['id'],
                         'values': vector_values,
-                        'metadata': product['metadata']
+                        'metadata': {
+                            **product['metadata'],
+                            'image_url': product['image_url']  # Ensure image_url is in metadata
+                        }
                     }]
                     
                     # Upsert to Pinecone
-                    self.index.upsert(vectors=vector_data)  # Pass list of vectors
-                    logger.info(f"Added product {product['id']} to index")
+                    self.index.upsert(vectors=vector_data)
+                    logger.info(f"Added product {product['id']} to index with image URL")
                 else:
                     logger.warning(f"Skipping product {product['id']} - could not generate embedding")
                     

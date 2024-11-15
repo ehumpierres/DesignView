@@ -64,8 +64,32 @@ class SearchResult(BaseModel):
     score: float
     metadata: Dict[str, Any]
     
+    def dict(self, *args, **kwargs):
+        """Override dict method to ensure safe serialization"""
+        return {
+            "id": str(self.id),
+            "score": float(self.score),
+            "metadata": {
+                **{k: str(v) if not isinstance(v, (str, int, float, bool, type(None)))
+                   else v
+                   for k, v in self.metadata.items()},
+                "image_url": self.metadata.get("image_url", None)  # Ensure image_url is included
+            }
+        }
+
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {
             # Add any special type handling here
         }
+
+class ProductInput(BaseModel):
+    id: str
+    image_url: str
+    metadata: ProductMetadata
+
+    def flatten_metadata(self) -> Dict[str, Any]:
+        """Flatten metadata and ensure image_url is included"""
+        flattened = self.metadata.dict()
+        flattened['image_url'] = self.image_url  # Include image_url in metadata
+        return flattened

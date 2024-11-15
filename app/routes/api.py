@@ -58,12 +58,15 @@ async def build_index(products: List[ProductInput], request: Request):
         if not search_engine:
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Convert products once using the encoder
-        batch_data = safe_json_encode([{
+        # Convert products with image URLs included in metadata
+        batch_data = [{
             'id': str(p.id),
             'image_url': str(p.image_url),
-            'metadata': p.metadata.flatten_metadata()
-        } for p in products])
+            'metadata': {
+                **p.metadata.dict(),
+                'image_url': str(p.image_url)  # Explicitly include image_url in metadata
+            }
+        } for p in products]
         
         await search_engine.add_to_index(batch_data)
         
