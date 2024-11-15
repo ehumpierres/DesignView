@@ -8,8 +8,10 @@ from typing import List, Dict, Any, Optional
 from app.services.s3_handler import S3Handler
 import logging
 import requests
-from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, HttpUrl
+from app.utils.encoders import safe_json_encode
+from fastapi.responses import JSONResponse
+from fastapi import status
 
 logger = logging.getLogger(__name__)
 
@@ -30,108 +32,75 @@ async def search(
     image_url: Optional[str] = Form(default=None),
     num_results: int = Form(default=5)
 ):
-    logger.info(f"Search request received with raw params: text='{text}', image_url='{image_url}', num_results={num_results}")
-    
     try:
         search_engine = request.app.state.search_engine
         if not search_engine:
-            logger.error("Search engine not initialized")
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        # Create and validate query
-        try:
-            query = SearchQuery(
-                text=text,
-                image_url=image_url,
-                num_results=num_results
-            )
-            # Explicit validation call
-            query.validate_query()
-            logger.info(f"Query validated successfully: {query.dict()}")
-            
-        except ValueError as ve:
-            logger.error(f"Query validation failed: {str(ve)}")
-            raise HTTPException(status_code=400, detail=str(ve))
+        query = SearchQuery(
+            text=text,
+            image_url=image_url,
+            num_results=num_results
+        )
+        query.validate_query()
         
-        # Execute search
         results = await search_engine.search(query)
-        logger.info(f"Search completed with {len(results)} results")
-        
-        return [result.dict() for result in results]
+        return safe_json_encode(results)  # Use existing encoder
         
     except Exception as e:
         logger.exception("Search failed")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Search failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/index/build")
 async def build_index(products: List[ProductInput], request: Request):
     try:
         search_engine = request.app.state.search_engine
-        
         if not search_engine:
             raise HTTPException(status_code=500, detail="Search engine not initialized")
         
-        batch_size = 10
-        results = []
+        # Convert products once using the encoder
+        batch_data = safe_json_encode([{
+            'id': str(p.id),
+            'image_url': str(p.image_url),
+            'metadata': p.metadata.flatten_metadata()
+        } for p in products])
         
-        for i in range(0, len(products), batch_size):
-            batch = products[i:i + batch_size]
-            
-            # Convert each product using flattened metadata
-            batch_data = [{
-                'id': str(p.id),
-                'image_url': str(p.image_url),
-                'metadata': p.metadata.flatten_metadata()  # Use new flatten method
-            } for p in batch]
-            
-            try:
-                await search_engine.add_to_index(batch_data)
-                results.extend([p.id for p in batch])
-            except Exception as e:
-                logger.error(f"Error processing batch {i//batch_size}: {str(e)}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Error processing batch {i//batch_size}: {str(e)}"
-                )
+        await search_engine.add_to_index(batch_data)
         
         return {
             "status": "success",
-            "processed_count": len(results),
-            "processed_ids": results
+            "processed_count": len(products),
+            "processed_ids": [p.id for p in products]
         }
         
     except Exception as e:
         logger.error(f"Index build failed: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/health")
 async def health_check(request: Request):
     try:
         search_engine = request.app.state.search_engine
         if not search_engine:
-            return {"status": "unhealthy", "error": "Search engine not initialized"}
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"status": "unhealthy", "error": "Search engine not initialized"}
+            )
             
-        # Test Pinecone connection
-        index_stats = search_engine.index.describe_index_stats()
-        
+        health_status = await search_engine.check_health()
         return {
             "status": "healthy",
-            "model_loaded": search_engine.model_loaded,
-            "pinecone_connected": True,
-            "index_stats": index_stats
+            "details": health_status
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "error": str(e)
+            }
+        )
 
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...)):

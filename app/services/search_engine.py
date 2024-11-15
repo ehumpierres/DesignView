@@ -1,4 +1,4 @@
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Dict, Any
 from PIL import Image
 import torch
 import clip
@@ -18,7 +18,7 @@ from typing import List, Dict, Any
 from loguru import logger
 import aiohttp
 from pydantic import HttpUrl, ValidationError
-import pinecone
+from app.utils.encoders import safe_json_encode
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,9 @@ class ProductSearchEngine:
         """
         if not self.initialized:
             try:
+                # Add environment validation before initialization
+                self.validate_env_vars()
+                
                 self.device = "cpu"  # Force CPU to save memory
                 torch.set_num_threads(1)  # Limit threads
                 self.model = None
@@ -82,6 +85,13 @@ class ProductSearchEngine:
                 logger.error(f"Failed to initialize search engine: {str(e)}")
                 self.model_loaded = False
                 raise
+
+    def validate_env_vars(self):
+        """Validate required environment variables"""
+        required_vars = ['PINECONE_API_KEY', 'PINECONE_ENVIRONMENT', 'PINECONE_INDEX_NAME']
+        missing = [var for var in required_vars if not os.getenv(var)]
+        if missing:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
     async def ensure_model_loaded(self):
         """Load CLIP model if not already loaded"""
@@ -195,22 +205,9 @@ class ProductSearchEngine:
             raise
 
     async def search(self, query: SearchQuery) -> List[SearchResult]:
-        """
-        Search for similar products using either image or text query
-        
-        Args:
-            query_image_url: Optional URL of query image
-            query_text: Optional text query
-            num_results: Number of results to return
-            
-        Returns:
-            List of search results with scores and metadata
-        """
         try:
-            # Ensure model is loaded
             await self.ensure_model_loaded()
             
-            # Get embedding based on query type
             if query.text:
                 embedding = await self._get_text_embedding(query.text)
             elif query.image_url:
@@ -218,22 +215,22 @@ class ProductSearchEngine:
             else:
                 raise ValueError("Either text or image_url must be provided")
 
-            # Perform vector search
             results = self.index.query(
                 vector=embedding.tolist(),
                 top_k=query.num_results,
                 include_metadata=True
             )
             
-            logger.info(f"Search completed with {len(results.matches)} results")
-            
-            search_results = []
-            for match in results.matches:
-                search_results.append(SearchResult(
-                    id=match.id,
+            # Clean and validate results before creating SearchResult objects
+            search_results = [
+                SearchResult(
+                    id=str(match.id),
                     score=float(match.score),
-                    metadata=match.metadata
-                ))
+                    metadata=safe_json_encode(match.metadata)
+                )
+                for match in results.matches
+            ]
+            
             return search_results
             
         except Exception as e:
@@ -320,3 +317,26 @@ class ProductSearchEngine:
         except Exception as e:
             logger.error(f"Error during shutdown: {str(e)}")
             raise
+
+    async def _get_text_embedding(self, text: str) -> np.ndarray:
+        """Get CLIP embedding for text"""
+        try:
+            await self.ensure_model_loaded()
+            with torch.no_grad():
+                text_tokens = clip.tokenize([text]).to(self.device)
+                embedding = self.model.encode_text(text_tokens)
+                embedding = embedding.cpu().numpy()
+                embedding = embedding / np.linalg.norm(embedding)
+                return embedding
+        except Exception as e:
+            logger.error(f"Error generating text embedding: {str(e)}")
+            raise
+
+    async def check_health(self) -> Dict[str, Any]:
+        """Check health status of search engine components"""
+        return {
+            "model_loaded": self.model_loaded,
+            "index_connected": hasattr(self, 'index'),
+            "device": str(self.device),
+            "memory_usage": torch.cuda.memory_allocated() if torch.cuda.is_available() else None
+        }

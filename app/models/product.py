@@ -4,29 +4,27 @@ from pydantic import BaseModel, Field, HttpUrl, validator
 class ProductMetadata(BaseModel):
     name: str
     description: str
-    specifications: Dict[str, str]
-    category: Optional[str]
-
-    def flatten_metadata(self) -> Dict[str, str]:
-        """Convert nested specifications into flattened metadata"""
-        flattened = {
-            'name': self.name,
-            'description': self.description,
+    category: str
+    
+    def flatten_metadata(self) -> Dict[str, Any]:
+        """Convert metadata to a flat dictionary with basic types"""
+        return {
+            "name": str(self.name),
+            "description": str(self.description),
+            "category": str(self.category)
         }
-        if self.category:
-            flattened['category'] = self.category
-            
-        # Add specifications with prefix
-        for key, value in self.specifications.items():
-            flattened[f'spec_{key}'] = str(value)
-            
-        return flattened
 
 class Product(BaseModel):
     """Product model containing metadata and image URL"""
     id: str
-    metadata: Dict[str, Any]
     image_url: HttpUrl
+    metadata: ProductMetadata
+    
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            HttpUrl: str
+        }
 
 class SearchQuery(BaseModel):
     """Search query model supporting either image URL or text search"""
@@ -63,9 +61,11 @@ class SearchQuery(BaseModel):
 class SearchResult(BaseModel):
     """Search result model containing product info and similarity score"""
     id: str
+    score: float
     metadata: Dict[str, Any]
-    image_url: Optional[HttpUrl] = None
-    score: float = Field(ge=0.0, le=1.0)
-
+    
     class Config:
         arbitrary_types_allowed = True
+        json_encoders = {
+            # Add any special type handling here
+        }

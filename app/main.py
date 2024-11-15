@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from app.routes.api import router
@@ -9,11 +11,23 @@ import logging
 from app.services.search_engine import ProductSearchEngine
 import os
 import sys
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
 # Core app setup
 app = FastAPI(title="Product Search API")
+
+# Add rate limiting middleware
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add security middlewares
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])  # Configure for your domains
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Include the router with a prefix
 app.include_router(router, prefix="/api")
@@ -52,9 +66,11 @@ async def root():
 # Important startup event for initializing search engine
 @app.on_event("startup")
 async def startup_event():
-    """Initialize search engine on startup"""
+    """Initialize search engine and validate environment on startup"""
     try:
         search_engine = ProductSearchEngine()
+        # Validate environment variables
+        search_engine.validate_env_vars()
         app.state.search_engine = search_engine
         logger.info("Search engine initialized in app state")
     except Exception as e:
