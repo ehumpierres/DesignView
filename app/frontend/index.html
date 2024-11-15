@@ -194,6 +194,9 @@
                 try {
                     responseData = JSON.parse(responseText);
                     console.log('Parsed response data:', responseData);
+                    if (responseData && responseData.length > 0) {
+                        console.log('Single result structure:', responseData[0]);
+                    }
                 } catch (parseError) {
                     console.error('JSON parse error:', parseError);
                     throw new Error(`Failed to parse response: ${responseText}`);
