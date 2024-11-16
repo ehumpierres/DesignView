@@ -193,7 +193,7 @@
                 if (Array.isArray(results) && results.length > 0) {
                     resultsDiv.innerHTML = results.map(result => `
                         <div class="search-result">
-                            <img src="${result.image_url}" alt="Product image">
+                            <img src="${result.metadata.image_url}" alt="Product image">
                             <div class="result-details">
                                 <h3>${result.metadata.name || 'Unnamed Product'}</h3>
                                 <p>${result.metadata.description || 'No description available'}</p>
@@ -201,10 +201,10 @@
                                 <p>SKU: ${result.metadata.sku}</p>
                                 <p>Specifications:</p>
                                 <ul>
-                                    <li>Color: ${result.metadata.specifications.color}</li>
-                                    <li>Dimensions: ${result.metadata.specifications.dimensions}</li>
-                                    <li>Wattage: ${result.metadata.specifications.wattage}</li>
-                                    <li>Type: ${result.metadata.specifications.type}</li>
+                                    <li>Color: ${result.metadata.spec_color}</li>
+                                    <li>Dimensions: ${result.metadata.spec_dimensions}</li>
+                                    <li>Wattage: ${result.metadata.spec_wattage}</li>
+                                    <li>Type: ${result.metadata.spec_type}</li>
                                 </ul>
                                 <p>Score: ${(result.score * 100).toFixed(2)}%</p>
                             </div>
