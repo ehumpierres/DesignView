@@ -232,33 +232,49 @@
             const imageUrl = document.getElementById('imageUrl').value;
             const numResults = document.getElementById('numResults').value || '5';
             
+            // Clear previous errors
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+            
+            console.log('=== Starting Search Request ===');
+            console.log('Image File:', imageFile ? {
+                name: imageFile.name,
+                size: imageFile.size,
+                type: imageFile.type
+            } : 'None');
+            console.log('Image URL:', imageUrl || 'None');
+            console.log('Number of results:', numResults);
+            
             try {
                 // Add loading state
-                const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'loading active';
-                loadingDiv.textContent = 'Processing...';
-                resultsDiv.innerHTML = '';
-                resultsDiv.appendChild(loadingDiv);
-                
-                // Check file size
-                if (imageFile && imageFile.size > 5 * 1024 * 1024) { // 5MB limit
-                    throw new Error('Image file is too large. Please use an image under 5MB.');
-                }
-                
-                // Add timeout to fetch requests
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+                resultsDiv.innerHTML = '<div class="loading active">Processing request...</div>';
                 
                 if (imageFile) {
-                    console.log('Uploading image file:', imageFile.name, 'Size:', imageFile.size);
+                    console.log('Preparing image file upload...');
                     formData.append('file', imageFile);
+                    console.log('File added to FormData');
                 } else if (imageUrl) {
-                    console.log('Using image URL:', imageUrl);
+                    console.log('Preparing image URL submission...');
                     formData.append('image_url', imageUrl);
+                    console.log('URL added to FormData');
                 }
                 
                 formData.append('num_results', numResults);
+                console.log('FormData prepared, sending request to:', `${API_URL}/api/search`);
                 
+                // Log FormData contents
+                for (let pair of formData.entries()) {
+                    console.log('FormData entry:', pair[0], pair[1] instanceof File ? 
+                        `[File: ${pair[1].name}, ${pair[1].size} bytes]` : pair[1]);
+                }
+                
+                const controller = new AbortController();
+                const timeout = setTimeout(() => {
+                    controller.abort();
+                    console.error('Request timed out after 30 seconds');
+                }, 30000);
+                
+                console.log('Sending request...');
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
                     body: formData,
@@ -266,18 +282,22 @@
                 });
                 
                 clearTimeout(timeout);
+                console.log('Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
                 
-                // Log response details
-                console.log('Response status:', response.status);
                 const responseText = await response.text();
                 console.log('Response text:', responseText);
                 
                 if (!response.ok) {
-                    throw new Error(`Server error: ${responseText}`);
+                    throw new Error(`Server error (${response.status}): ${responseText}`);
                 }
                 
-                // Parse response
+                console.log('Parsing response...');
                 const responseData = JSON.parse(responseText);
+                console.log('Parsed response data:', responseData);
                 
                 // Display results
                 resultsDiv.innerHTML = Array.isArray(responseData) ? 
@@ -301,8 +321,14 @@
                         </div>
                     `).join('') : 'Invalid response format';
                 
+                console.log('=== Search Request Completed ===');
+                
             } catch (error) {
-                console.error('Search error:', error);
+                console.error('=== Search Request Failed ===');
+                console.error('Error type:', error.constructor.name);
+                console.error('Error message:', error.message);
+                console.error('Stack trace:', error.stack);
+                
                 errorDiv.style.display = 'block';
                 errorDiv.textContent = `Error: ${error.message}`;
                 resultsDiv.innerHTML = '';
@@ -371,9 +397,30 @@
         // Add visible debug panel
         const debugPanel = document.createElement('div');
         debugPanel.innerHTML = `
-            <div id="debugPanel" style="position: fixed; bottom: 0; right: 0; background: #f0f0f0; padding: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ccc;">
-                <h4>Debug Log</h4>
-                <pre id="debugOutput"></pre>
+            <div id="debugPanel" style="
+                position: fixed; 
+                bottom: 0; 
+                right: 0; 
+                background: #f0f0f0; 
+                padding: 10px; 
+                max-height: 300px; 
+                width: 600px;
+                overflow-y: auto; 
+                border: 1px solid #ccc;
+                font-family: monospace;
+                z-index: 1000;
+                box-shadow: -2px -2px 10px rgba(0,0,0,0.1);">
+                <h4 style="margin: 0 0 10px 0;">Debug Log</h4>
+                <pre id="debugOutput" style="
+                    margin: 0;
+                    white-space: pre-wrap;       /* CSS3 */
+                    white-space: -moz-pre-wrap;  /* Firefox */
+                    white-space: -pre-wrap;      /* Opera <7 */
+                    white-space: -o-pre-wrap;    /* Opera 7 */
+                    word-wrap: break-word;       /* IE */
+                    font-size: 12px;
+                    line-height: 1.4;
+                "></pre>
             </div>
         `;
         document.body.appendChild(debugPanel);

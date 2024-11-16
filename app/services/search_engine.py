@@ -118,35 +118,67 @@ class ProductSearchEngine:
     async def _get_image_embedding(self, image_url: str) -> Optional[np.ndarray]:
         """Get CLIP embedding for an image URL"""
         try:
+            logger.info(f"Starting image embedding generation for URL: {image_url}")
+            
             # Ensure model is loaded
             await self.ensure_model_loaded()
+            logger.info("Model ready for embedding generation")
             
             # Download image
             async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to fetch image: {response.status}")
-                    
-                    image_data = await response.read()
-                    image = Image.open(io.BytesIO(image_data)).convert('RGB')
-                    
-                    # Preprocess image
-                    image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
-                    
-                    # Generate embedding
-                    with torch.no_grad():
-                        embedding = self.model.encode_image(image_tensor)
-                        embedding = embedding.cpu().numpy()
-                        # Normalize
-                        embedding = embedding / np.linalg.norm(embedding)
-                    
-                    # Clear memory
-                    del image_data
-                    del image
-                    del image_tensor
-                    gc.collect()
-                    
-                    return embedding
+                try:
+                    logger.info("Fetching image from URL")
+                    async with session.get(image_url) as response:
+                        if response.status != 200:
+                            logger.error(f"Failed to fetch image. Status: {response.status}, URL: {image_url}")
+                            raise ValueError(f"Failed to fetch image: HTTP {response.status}")
+                        
+                        image_data = await response.read()
+                        logger.info(f"Image downloaded: {len(image_data)} bytes")
+                        
+                        # Validate image data
+                        if len(image_data) == 0:
+                            raise ValueError("Empty image data received")
+                        
+                        # Open and validate image
+                        image = Image.open(io.BytesIO(image_data))
+                        if image.mode != 'RGB':
+                            logger.info(f"Converting image from {image.mode} to RGB")
+                            image = image.convert('RGB')
+                        
+                        logger.info(f"Image opened successfully: {image.size}")
+                        
+                        # Preprocess image
+                        image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+                        logger.info("Image preprocessed successfully")
+                        
+                        # Generate embedding
+                        with torch.no_grad():
+                            logger.info("Generating embedding")
+                            embedding = self.model.encode_image(image_tensor)
+                            embedding = embedding.cpu().numpy()
+                            # Normalize
+                            embedding = embedding / np.linalg.norm(embedding)
+                            logger.info("Embedding generated and normalized")
+                        
+                        # Clear memory
+                        del image_data
+                        del image
+                        del image_tensor
+                        gc.collect()
+                        
+                        logger.info("Image embedding generation completed successfully")
+                        return embedding
+                        
+                except aiohttp.ClientError as e:
+                    logger.error(f"Network error fetching image: {str(e)}")
+                    raise
+                except PIL.UnidentifiedImageError as e:
+                    logger.error(f"Invalid image format: {str(e)}")
+                    raise ValueError("Invalid image format")
+                except Exception as e:
+                    logger.error(f"Error processing image: {str(e)}")
+                    raise
                     
         except Exception as e:
             logger.error(f"Error generating embedding for {image_url}: {str(e)}")
@@ -206,38 +238,71 @@ class ProductSearchEngine:
 
     async def search(self, query: SearchQuery) -> List[SearchResult]:
         try:
-            await self.ensure_model_loaded()
+            logger.info("Starting search operation")
+            logger.info(f"Query params: text='{query.text}', image_url='{query.image_url}', num_results={query.num_results}")
             
+            await self.ensure_model_loaded()
+            logger.info("Model loaded successfully")
+            
+            embedding = None
             if query.text:
+                logger.info("Generating text embedding")
                 embedding = await self._get_text_embedding(query.text)
             elif query.image_url:
+                logger.info(f"Generating image embedding for URL: {query.image_url}")
                 embedding = await self._get_image_embedding(query.image_url)
+                if embedding is None:
+                    raise ValueError("Failed to generate image embedding")
             else:
                 raise ValueError("Either text or image_url must be provided")
-
+            
+            logger.info("Embedding generated successfully")
+            
+            # Log embedding shape and basic stats
+            logger.debug(f"Embedding shape: {embedding.shape}")
+            logger.debug(f"Embedding stats - min: {np.min(embedding)}, max: {np.max(embedding)}, mean: {np.mean(embedding)}")
+            
+            logger.info(f"Querying Pinecone index for top {query.num_results} results")
             results = self.index.query(
                 vector=embedding.tolist(),
                 top_k=query.num_results,
                 include_metadata=True
             )
             
-            # Clean and validate results before creating SearchResult objects
-            search_results = [
-                SearchResult(
-                    id=str(match.id),
-                    score=float(match.score),
-                    metadata={
-                        **match.metadata,
-                        'image_url': match.metadata.get('image_url')
-                    }
-                )
-                for match in results.matches
-            ]
+            logger.info(f"Received {len(results.matches)} matches from Pinecone")
             
+            # Log each match for debugging
+            for i, match in enumerate(results.matches):
+                logger.debug(f"Match {i+1}: ID={match.id}, Score={match.score}, "
+                            f"Has image_url={'image_url' in match.metadata}")
+            
+            # Clean and validate results before creating SearchResult objects
+            search_results = []
+            for match in results.matches:
+                try:
+                    result = SearchResult(
+                        id=str(match.id),
+                        score=float(match.score),
+                        metadata={
+                            **match.metadata,
+                            'image_url': match.metadata.get('image_url')
+                        }
+                    )
+                    search_results.append(result)
+                    logger.debug(f"Successfully created SearchResult for ID: {match.id}")
+                except Exception as e:
+                    logger.error(f"Error creating SearchResult for match {match.id}: {str(e)}")
+                    continue
+            
+            logger.info(f"Returning {len(search_results)} validated results")
             return search_results
             
+        except ValueError as e:
+            logger.error(f"Validation error during search: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Error during search: {str(e)}")
+            logger.error(f"Unexpected error during search: {str(e)}")
+            logger.exception("Full traceback:")
             raise
 
     async def cleanup(self):
