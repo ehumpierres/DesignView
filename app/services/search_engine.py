@@ -436,14 +436,25 @@ class ProductSearchEngine:
                     # Ensure embedding is properly formatted
                     vector_values = image_embedding.squeeze().tolist()
                     
-                    # Prepare vector data with image_url in metadata
+                    # Flatten the specifications into the metadata
+                    flattened_metadata = {
+                        'name': str(product['metadata']['name']),
+                        'description': str(product['metadata']['description']),
+                        'category': str(product['metadata']['category']),
+                        'price': float(product['metadata']['price']),
+                        'sku': str(product['metadata']['sku']),
+                        'image_url': str(product['image_url']),
+                        'spec_color': str(product['metadata']['specifications']['color']),
+                        'spec_dimensions': str(product['metadata']['specifications']['dimensions']),
+                        'spec_wattage': str(product['metadata']['specifications']['wattage']),
+                        'spec_type': str(product['metadata']['specifications']['type'])
+                    }
+                    
+                    # Prepare vector data with flattened metadata
                     vector_data = [{
                         'id': product['id'],
                         'values': vector_values,
-                        'metadata': {
-                            **product['metadata'],
-                            'image_url': product['image_url']  # Ensure image_url is in metadata
-                        }
+                        'metadata': flattened_metadata
                     }]
                     
                     # Upsert to Pinecone
