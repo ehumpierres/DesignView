@@ -1,5 +1,5 @@
 from typing import Union, List, Optional, Dict, Any
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import torch
 import clip
 import numpy as np
@@ -236,47 +236,113 @@ class ProductSearchEngine:
             logger.error(f"Error building index: {str(e)}")
             raise
 
+    async def _cleanup_memory(self):
+        """Clean up GPU/CPU memory"""
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+            logger.debug("Memory cleanup completed")
+        except Exception as e:
+            logger.warning(f"Memory cleanup warning: {str(e)}")
+
+    def validate_search_input(self, query: SearchQuery) -> None:
+        """
+        Validate search query inputs
+        
+        Args:
+            query: SearchQuery object containing search parameters
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        # Check if at least one search method is provided
+        if not any([query.text, query.image_url, getattr(query, 'image_file', None)]):
+            raise ValueError("Must provide either text, image URL, or image file")
+        
+        # Check if multiple search methods are provided
+        search_methods = sum([
+            bool(query.text),
+            bool(query.image_url),
+            bool(getattr(query, 'image_file', None))
+        ])
+        if search_methods > 1:
+            raise ValueError("Please provide only one search method")
+        
+        # Validate number of results
+        if query.num_results < 1:
+            raise ValueError("num_results must be greater than 0")
+        
+        logger.debug("Search input validation passed")
+
     async def search(self, query: SearchQuery) -> List[SearchResult]:
+        """
+        Perform similarity search based on text, image URL, or uploaded image
+        
+        Args:
+            query: SearchQuery object containing search parameters
+            
+        Returns:
+            List[SearchResult]: List of search results
+            
+        Raises:
+            ValueError: If input validation fails or embedding generation fails
+        """
         try:
             logger.info("Starting search operation")
-            logger.info(f"Query params: text='{query.text}', image_url='{query.image_url}', num_results={query.num_results}")
             
+            # Validate inputs
+            self.validate_search_input(query)
+            
+            # Ensure model is loaded
             await self.ensure_model_loaded()
-            logger.info("Model loaded successfully")
             
+            # Get embedding based on input type
             embedding = None
+            
             if query.text:
-                logger.info("Generating text embedding")
+                logger.info(f"Processing text search: {query.text[:50]}...")
                 embedding = await self._get_text_embedding(query.text)
+                
             elif query.image_url:
-                logger.info(f"Generating image embedding for URL: {query.image_url}")
+                logger.info(f"Processing image URL search: {query.image_url}")
                 embedding = await self._get_image_embedding(query.image_url)
-                if embedding is None:
-                    raise ValueError("Failed to generate image embedding")
-            else:
-                raise ValueError("Either text or image_url must be provided")
-            
-            logger.info("Embedding generated successfully")
-            
-            # Log embedding shape and basic stats
-            logger.debug(f"Embedding shape: {embedding.shape}")
-            logger.debug(f"Embedding stats - min: {np.min(embedding)}, max: {np.max(embedding)}, mean: {np.mean(embedding)}")
-            
-            logger.info(f"Querying Pinecone index for top {query.num_results} results")
+                
+            elif hasattr(query, 'image_file') and query.image_file:
+                logger.info("Processing uploaded image file")
+                try:
+                    # Read and process uploaded file
+                    image = Image.open(io.BytesIO(query.image_file))
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    
+                    # Generate embedding
+                    image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+                    with torch.no_grad():
+                        embedding = self.model.encode_image(image_tensor)
+                        embedding = embedding.cpu().numpy()
+                        embedding = embedding / np.linalg.norm(embedding)
+                    
+                    # Cleanup
+                    del image_tensor
+                    await self._cleanup_memory()
+                    
+                except UnidentifiedImageError:
+                    raise ValueError("Invalid image file format")
+                except Exception as e:
+                    raise ValueError(f"Error processing image file: {str(e)}")
+
+            if embedding is None:
+                raise ValueError("Failed to generate embedding")
+
+            logger.info("Querying Pinecone index")
             results = self.index.query(
                 vector=embedding.tolist(),
                 top_k=query.num_results,
                 include_metadata=True
             )
-            
-            logger.info(f"Received {len(results.matches)} matches from Pinecone")
-            
-            # Log each match for debugging
-            for i, match in enumerate(results.matches):
-                logger.debug(f"Match {i+1}: ID={match.id}, Score={match.score}, "
-                            f"Has image_url={'image_url' in match.metadata}")
-            
-            # Clean and validate results before creating SearchResult objects
+
+            # Process and validate results
             search_results = []
             for match in results.matches:
                 try:
@@ -289,21 +355,27 @@ class ProductSearchEngine:
                         }
                     )
                     search_results.append(result)
-                    logger.debug(f"Successfully created SearchResult for ID: {match.id}")
+                    logger.debug(f"Processed result: ID={match.id}, Score={match.score}")
                 except Exception as e:
-                    logger.error(f"Error creating SearchResult for match {match.id}: {str(e)}")
+                    logger.error(f"Error processing result {match.id}: {str(e)}")
                     continue
+
+            # Final cleanup
+            await self._cleanup_memory()
             
-            logger.info(f"Returning {len(search_results)} validated results")
+            logger.info(f"Search completed. Found {len(search_results)} results")
             return search_results
-            
+
         except ValueError as e:
-            logger.error(f"Validation error during search: {str(e)}")
+            logger.error(f"Validation error: {str(e)}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during search: {str(e)}")
+            logger.error(f"Search error: {str(e)}")
             logger.exception("Full traceback:")
             raise
+        finally:
+            # Ensure memory is cleaned up even if an error occurs
+            await self._cleanup_memory()
 
     async def cleanup(self):
         """Optional: Delete the index when needed"""

@@ -29,7 +29,8 @@ class Product(BaseModel):
 class SearchQuery(BaseModel):
     """Search query model supporting either image URL or text search"""
     text: Optional[str] = None
-    image_url: Optional[str] = None
+    image_url: Optional[HttpUrl] = None
+    image_file: Optional[bytes] = None
     num_results: int = Field(default=5, ge=1, le=100)
 
     @validator('text', 'image_url', pre=True)
