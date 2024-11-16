@@ -47,15 +47,32 @@
             border-radius: 4px;
             display: flex;
             gap: 20px;
+            align-items: flex-start;
+        }
+
+        .search-result .image-container {
+            width: 400px;
+            height: 400px;
+            flex-shrink: 0;
+            position: relative;
+            background-color: #ffffff;
         }
 
         .search-result img {
-            max-width: 200px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
             height: auto;
+            object-fit: contain;
         }
 
         .result-details {
             flex: 1;
+            min-width: 0;
         }
 
         #errorMessage {
@@ -193,7 +210,9 @@
                 if (Array.isArray(results) && results.length > 0) {
                     resultsDiv.innerHTML = results.map(result => `
                         <div class="search-result">
-                            <img src="${result.metadata.image_url}" alt="Product image">
+                            <div class="image-container">
+                                <img src="${result.metadata.image_url}" alt="Product image">
+                            </div>
                             <div class="result-details">
                                 <h3>${result.metadata.name || 'Unnamed Product'}</h3>
                                 <p>${result.metadata.description || 'No description available'}</p>
