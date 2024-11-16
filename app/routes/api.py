@@ -25,7 +25,7 @@ class ProductInput(BaseModel):
     image_url: HttpUrl
     metadata: ProductMetadata
 
-@router.post("/api/search")
+@router.post("/search")
 async def search(
     text: Optional[str] = Form(None),
     image_url: Optional[str] = Form(None),
