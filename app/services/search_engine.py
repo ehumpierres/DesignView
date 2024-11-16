@@ -396,6 +396,9 @@ class ProductSearchEngine:
             # Get image embedding
             image_features = await self._get_image_embedding(product.image_url)
             
+            if image_features is None:
+                raise ValueError(f"Failed to generate image embedding for product {product.id}")
+            
             # Get text embedding from metadata
             metadata_text = (
                 f"{product.metadata.name} "
@@ -404,6 +407,7 @@ class ProductSearchEngine:
                 f"{product.metadata.specifications.color} "
                 f"{product.metadata.specifications.type}"
             )
+            
             with torch.no_grad():
                 text = clip.tokenize([metadata_text]).to(self.device)
                 text_features = self.model.encode_text(text)

@@ -76,8 +76,18 @@ async def build_index(products: List[ProductInput], request: Request):
             'id': str(p.id),
             'image_url': str(p.image_url),
             'metadata': {
-                **p.metadata.dict(),
-                'image_url': str(p.image_url)  # Explicitly include image_url in metadata
+                'name': p.metadata.name,
+                'description': p.metadata.description,
+                'category': p.metadata.category,
+                'price': p.metadata.price,
+                'sku': p.metadata.sku,
+                'specifications': {
+                    'color': p.metadata.specifications.color,
+                    'dimensions': p.metadata.specifications.dimensions,
+                    'wattage': p.metadata.specifications.wattage,
+                    'type': p.metadata.specifications.type
+                },
+                'image_url': str(p.image_url)
             }
         } for p in products]
         
