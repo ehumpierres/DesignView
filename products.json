@@ -1,29 +1,342 @@
 [
     {
-        "id": "lamp0001",
+        "id": "TOB3694CSA-L",
         "metadata": {
-            "name": "Led Table Lamp",
-            "description": "In Warm Iron and Dark Walnut by Visual Comfort Signature from the Zenz collection.",
+            "name": "LED Table Lamp",
+            "description": "In Crackled Sienna by Visual Comfort Signature from the Sao Paulo collection.",
             "specifications": {
-                "color": "black and white",
-                "material": "iron and walnut",
-                "dimensions": "11.5x11.5x21 inches"
+                "color": "Crackled Sienna",
+                "dimensions": "17.5x17.5x29.25 inches",
+                "wattage": "15W",
+                "type": "A19"
             },
-            "category": "accent lamps"
+            "category": "table lamps",
+            "price": 749.00,
+            "sku": "3611198"
         },
-        "image_url": "https://designview-demo.s3.us-east-2.amazonaws.com/products/lamp0001.jpg"
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499976.jpg"
     },
     {
-        "id": "lamp0002",
+        "id": "TOB3694CRN-L",
         "metadata": {
-            "name": "Led Table Lamp",
-            "description": "in Polished Nickel by Visual Comfort Signature from the Pertica collection.",
+            "name": "LED Table Lamp",
+            "description": "In Crackled Robin by Visual Comfort Signature from the Sao Paulo collection.",
             "specifications": {
-                "color": "silver",
-                "material": "nickel"
+                "color": "Crackled Robin",
+                "dimensions": "17.5x17.5x29.25 inches",
+                "wattage": "15W",
+                "type": "A19"
             },
-            "category": "accent lamps"
+            "category": "table lamps",
+            "price": 749.00,
+            "sku": "3611197"
         },
-        "image_url": "https://designview-demo.s3.us-east-2.amazonaws.com/products/lamp0002.jpg"
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499975.jpg"
+    },
+    {
+        "id": "TOB3694CIV-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Ivory by Visual Comfort Signature from the Sao Paulo collection.",
+            "specifications": {
+                "color": "Crackled Ivory",
+                "dimensions": "17.5x17.5x29.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 749.00,
+            "sku": "3611196"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499974.jpg"
+    },
+    {
+        "id": "TOB3693CSA-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Sienna by Visual Comfort Signature from the Sao Paulo collection.",
+            "specifications": {
+                "color": "Crackled Sienna",
+                "dimensions": "13x13x21.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611195"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499973.jpg"
+    },
+    {
+        "id": "TOB3693CRN-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Robin by Visual Comfort Signature from the Sao Paulo collection.",
+            "specifications": {
+                "color": "Crackled Robin",
+                "dimensions": "13x13x21.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611194"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499972.jpg"
+    },
+    {
+        "id": "TOB3693CIV-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Ivory by Visual Comfort Signature from the Sao Paulo collection.",
+            "specifications": {
+                "color": "Crackled Ivory",
+                "dimensions": "13x13x21.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611193"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499971.jpg"
+    },
+    {
+        "id": "TOB3691CSA-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Sienna by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Sienna",
+                "dimensions": "18x18x24.75 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 769.00,
+            "sku": "3611192"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499970.jpg"
+    },
+    {
+        "id": "TOB3691CRN-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Robin by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Robin",
+                "dimensions": "18x18x24.75 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 769.00,
+            "sku": "3611181"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499969.jpg"
+    },
+    {
+        "id": "TOB3691CIV-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Ivory by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Ivory",
+                "dimensions": "18x18x24.75 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 769.00,
+            "sku": "3611180"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499968.jpg"
+    },
+    {
+        "id": "TOB3690CSA-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Sienna by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Sienna",
+                "dimensions": "13x13x17.5 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611189"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499967.jpg"
+    },
+    {
+        "id": "TOB3690CRN-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Robin by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Robin",
+                "dimensions": "13x13x17.5 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611188"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499966.jpg"
+    },
+    {
+        "id": "TOB3690CIV-L",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Crackled Ivory by Visual Comfort Signature from the Olinda collection.",
+            "specifications": {
+                "color": "Crackled Ivory",
+                "dimensions": "13x13x17.5 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 499.00,
+            "sku": "3611187"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499965.jpg"
+    },
+    {
+        "id": "TOB3625WTC-L2",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In White Crackle by Visual Comfort Signature from the Cap-Ferrat collection.",
+            "specifications": {
+                "color": "White Crackle",
+                "dimensions": "23.75x23.75x26.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 1049.00,
+            "sku": "3611186"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499964.jpg"
+    },
+    {
+        "id": "TOB3625LH-L2",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Light Honey by Visual Comfort Signature from the Cap-Ferrat collection.",
+            "specifications": {
+                "color": "Light Honey",
+                "dimensions": "23.75x23.75x26.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 1049.00,
+            "sku": "3611185"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499963.jpg"
+    },
+    {
+        "id": "TOB3625LH-CY2",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Light Honey by Visual Comfort Signature from the Cap-Ferrat collection.",
+            "specifications": {
+                "color": "Light Honey",
+                "dimensions": "23.75x23.75x26.25 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 1049.00,
+            "sku": "3611184"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499962.jpg"
+    },
+    {
+        "id": "TOB3382PN",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Polished Nickel by Visual Comfort Signature from the Bravo collection.",
+            "specifications": {
+                "color": "Polished Nickel",
+                "dimensions": "8x20.25x19.75 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 1349.00,
+            "sku": "3611183"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499961.jpg"
+    },
+    {
+        "id": "TOB3382HAB",
+        "metadata": {
+            "name": "LED Table Lamp",
+            "description": "In Hand-Rubbed Antique Brass by Visual Comfort Signature from the Bravo collection.",
+            "specifications": {
+                "color": "Hand-Rubbed Antique Brass",
+                "dimensions": "8x20.25x19.75 inches",
+                "wattage": "15W",
+                "type": "A19"
+            },
+            "category": "table lamps",
+            "price": 1349.00,
+            "sku": "3611182"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499960.jpg"
+    },
+    {
+        "id": "TOB3100CG-L-CL",
+        "metadata": {
+            "name": "LED Accent Lamp",
+            "description": "In Crystal by Visual Comfort Signature from the Terri collection.",
+            "specifications": {
+                "color": "Crystal",
+                "dimensions": "6x6x12 inches",
+                "wattage": "2W",
+                "type": "LED"
+            },
+            "category": "accent lamps",
+            "price": 399.00,
+            "sku": "3611171"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499959.jpg"
+    },
+    {
+        "id": "TOB3100ALB-L-CL",
+        "metadata": {
+            "name": "LED Accent Lamp",
+            "description": "In Alabaster by Visual Comfort Signature from the Terri collection.",
+            "specifications": {
+                "color": "Alabaster",
+                "dimensions": "6x6x12 inches",
+                "wattage": "2W",
+                "type": "LED"
+            },
+            "category": "accent lamps",
+            "price": 399.00,
+            "sku": "3611170"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499958.jpg"
+    },
+    {
+        "id": "SP3021PN-L-CL",
+        "metadata": {
+            "name": "LED Buffet Lamp",
+            "description": "In Polished Nickel by Visual Comfort Signature from the Hackney collection.",
+            "specifications": {
+                "color": "Polished Nickel",
+                "dimensions": "11.5x11.5x23.5 inches",
+                "wattage": "2W",
+                "type": "LED"
+            },
+            "category": "buffet lamps",
+            "price": 429.00,
+            "sku": "3611179"
+        },
+        "image_url": "https://cdn.lightsamerica.com/images/SM5/1499957.jpg"
     }
 ] 

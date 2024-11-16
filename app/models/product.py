@@ -4,17 +4,29 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class ProductSpecifications(BaseModel):
+    color: str
+    dimensions: str
+    wattage: str
+    type: str
+
 class ProductMetadata(BaseModel):
     name: str
     description: str
+    specifications: ProductSpecifications
     category: str
+    price: float
+    sku: str
     
     def flatten_metadata(self) -> Dict[str, Any]:
         """Convert metadata to a flat dictionary with basic types"""
         return {
             "name": str(self.name),
             "description": str(self.description),
-            "category": str(self.category)
+            "category": str(self.category),
+            "price": float(self.price),
+            "sku": str(self.sku),
+            "specifications": self.specifications.dict()
         }
 
 class Product(BaseModel):

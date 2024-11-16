@@ -397,7 +397,13 @@ class ProductSearchEngine:
             image_features = await self._get_image_embedding(product.image_url)
             
             # Get text embedding from metadata
-            metadata_text = f"{product.metadata.get('name', '')} {product.metadata.get('description', '')} {product.metadata.get('category', '')}"
+            metadata_text = (
+                f"{product.metadata.name} "
+                f"{product.metadata.description} "
+                f"{product.metadata.category} "
+                f"{product.metadata.specifications.color} "
+                f"{product.metadata.specifications.type}"
+            )
             with torch.no_grad():
                 text = clip.tokenize([metadata_text]).to(self.device)
                 text_features = self.model.encode_text(text)
