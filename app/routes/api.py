@@ -25,30 +25,43 @@ class ProductInput(BaseModel):
     image_url: HttpUrl
     metadata: ProductMetadata
 
-@router.post("/search")
+@router.post("/api/search")
 async def search(
-    request: Request,
-    text: Optional[str] = Form(default=''),
-    image_url: Optional[str] = Form(default=None),
-    num_results: int = Form(default=5)
+    text: Optional[str] = Form(None),
+    image_url: Optional[str] = Form(None),
+    image_file: Optional[UploadFile] = File(None),
+    num_results: int = Form(5)
 ):
     try:
-        search_engine = request.app.state.search_engine
-        if not search_engine:
-            raise HTTPException(status_code=500, detail="Search engine not initialized")
+        # Log received data
+        logger.debug(f"Received search request - text: {bool(text)}, image_url: {bool(image_url)}, image_file: {bool(image_file)}")
         
+        # Convert UploadFile to bytes if present
+        image_file_bytes = None
+        if image_file:
+            image_file_bytes = await image_file.read()
+        
+        # Create SearchQuery object
         query = SearchQuery(
             text=text,
             image_url=image_url,
+            image_file=image_file_bytes,
             num_results=num_results
         )
-        query.validate_query()
         
+        # Get search engine instance
+        search_engine = ProductSearchEngine()
+        
+        # Perform search
         results = await search_engine.search(query)
-        return safe_json_encode(results)  # Use existing encoder
         
+        return results
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.exception("Search failed")
+        logger.error(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/index/build")

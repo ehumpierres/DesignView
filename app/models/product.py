@@ -1,5 +1,8 @@
 from typing import Dict, Optional, Any, Union
-from pydantic import BaseModel, Field, HttpUrl, validator
+from pydantic import BaseModel, Field, HttpUrl, validator, root_validator
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ProductMetadata(BaseModel):
     name: str
@@ -31,33 +34,32 @@ class SearchQuery(BaseModel):
     text: Optional[str] = None
     image_url: Optional[HttpUrl] = None
     image_file: Optional[bytes] = None
-    num_results: int = Field(default=5, ge=1, le=100)
-
-    @validator('text', 'image_url', pre=True)
-    def validate_query_inputs(cls, v):
-        if v is not None:
-            if isinstance(v, str) and len(v.strip()) == 0:
-                return None
-            return str(v).strip()
-        return v
+    num_results: int = 5
 
     @validator('num_results')
     def validate_num_results(cls, v):
-        try:
-            v = int(v)
-            if v < 1:
-                raise ValueError("Number of results must be at least 1")
-            if v > 100:
-                raise ValueError("Number of results cannot exceed 100")
-            return v
-        except (TypeError, ValueError):
-            raise ValueError("Number of results must be a valid integer")
+        if v < 1:
+            raise ValueError("num_results must be greater than 0")
+        return v
 
-    def validate_query(self):
-        """Additional validation to ensure at least one search criterion is provided"""
-        if not self.text and not self.image_url:
-            raise ValueError("Either text or image_url must be provided")
-        return True
+    @root_validator
+    def validate_query(cls, values):
+        text = values.get('text')
+        image_url = values.get('image_url')
+        image_file = values.get('image_file')
+        
+        # Log received values for debugging
+        logger.debug(f"Validating query - text: {bool(text)}, image_url: {bool(image_url)}, image_file: {bool(image_file)}")
+        
+        if not any([text, image_url, image_file]):
+            raise ValueError("Either text, image_url, or image_file must be provided")
+        
+        # Ensure only one search method is provided
+        methods = sum(bool(x) for x in [text, image_url, image_file])
+        if methods > 1:
+            raise ValueError("Please provide only one search method")
+            
+        return values
 
 class SearchResult(BaseModel):
     """Search result model containing product info and similarity score"""
