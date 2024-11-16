@@ -228,63 +228,56 @@
             e.preventDefault();
             
             const formData = new FormData();
-            const textInput = document.getElementById('searchText').value;
             const imageFile = document.getElementById('searchImage').files[0];
             const imageUrl = document.getElementById('imageUrl').value;
-            const numResults = document.getElementById('numResults').value;
-            
-            // Clear previous errors
-            errorDiv.style.display = 'none';
-            errorDiv.textContent = '';
+            const numResults = document.getElementById('numResults').value || '5';
             
             try {
-                // Check if we have at least one search input
-                if (!textInput && !imageFile && !imageUrl) {
-                    throw new Error('Please provide either text or an image to search');
+                // Add loading state
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'loading active';
+                loadingDiv.textContent = 'Processing...';
+                resultsDiv.innerHTML = '';
+                resultsDiv.appendChild(loadingDiv);
+                
+                // Check file size
+                if (imageFile && imageFile.size > 5 * 1024 * 1024) { // 5MB limit
+                    throw new Error('Image file is too large. Please use an image under 5MB.');
                 }
                 
-                // Handle file upload if present
+                // Add timeout to fetch requests
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+                
                 if (imageFile) {
-                    const uploadedUrl = await uploadImageToS3(imageFile);
-                    formData.append('image_url', uploadedUrl);
+                    console.log('Uploading image file:', imageFile.name, 'Size:', imageFile.size);
+                    formData.append('file', imageFile);
                 } else if (imageUrl) {
+                    console.log('Using image URL:', imageUrl);
                     formData.append('image_url', imageUrl);
                 }
                 
-                // Add other form data
-                formData.append('text', textInput || '');
-                formData.append('num_results', numResults || '5');
-                
-                // Show loading state
-                resultsDiv.innerHTML = '<div class="loading active">Searching...</div>';
+                formData.append('num_results', numResults);
                 
                 const response = await fetch(`${API_URL}/api/search`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
                 
-                // Get response text first for debugging
+                clearTimeout(timeout);
+                
+                // Log response details
+                console.log('Response status:', response.status);
                 const responseText = await response.text();
                 console.log('Response text:', responseText);
                 
-                // Try to parse JSON
-                let responseData;
-                try {
-                    responseData = JSON.parse(responseText);
-                    console.log('Parsed response data:', responseData);
-                    if (responseData && responseData.length > 0) {
-                        console.log('Single result structure:', responseData[0]);
-                    }
-                } catch (parseError) {
-                    console.error('JSON parse error:', parseError);
-                    throw new Error(`Failed to parse response: ${responseText}`);
+                if (!response.ok) {
+                    throw new Error(`Server error: ${responseText}`);
                 }
                 
-                if (!response.ok) {
-                    const errorMessage = typeof responseData === 'object' ? 
-                        JSON.stringify(responseData) : responseData;
-                    throw new Error(errorMessage);
-                }
+                // Parse response
+                const responseData = JSON.parse(responseText);
                 
                 // Display results
                 resultsDiv.innerHTML = Array.isArray(responseData) ? 
